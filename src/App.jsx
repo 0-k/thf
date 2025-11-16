@@ -434,17 +434,16 @@ export default function TempelhoferBikeForecast() {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 75) return 'text-green-800 bg-green-100 border-green-400';
-    if (score >= 50) return 'text-blue-800 bg-blue-100 border-blue-400';
-    if (score >= 25) return 'text-orange-800 bg-orange-100 border-orange-400';
-    return 'text-red-800 bg-red-100 border-red-400';
+    if (score >= 60) return 'text-green-900 bg-green-300 border-green-500';
+    if (score >= 30) return 'text-yellow-900 bg-yellow-300 border-yellow-500';
+    if (score >= 1) return 'text-red-900 bg-red-300 border-red-500';
+    return 'text-gray-700 bg-gray-200 border-gray-400';
   };
 
   const getScoreLabel = (score) => {
     if (score === 0) return 'Closed';
-    if (score >= 75) return 'Excellent';
-    if (score >= 50) return 'Good';
-    if (score >= 25) return 'Fair';
+    if (score >= 60) return 'Good';
+    if (score >= 30) return 'Fair';
     return 'Poor';
   };
 
@@ -854,26 +853,22 @@ export default function TempelhoferBikeForecast() {
             </div>
             <div>
               <h4 className="font-semibold text-gray-700 mb-3">Score Ranges:</h4>
-              <ul className="space-y-2">
-                <li className="flex items-center gap-2">
-                  <span className="w-16 h-6 bg-green-100 border-2 border-green-400 rounded"></span>
-                  <span className="text-green-800 font-medium">75-100: Excellent</span>
+              <ul className="space-y-3">
+                <li className="flex items-center gap-3">
+                  <span className="w-20 h-8 bg-green-300 border-2 border-green-500 rounded"></span>
+                  <span className="text-green-900 font-semibold">60-100: Good</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-16 h-6 bg-blue-100 border-2 border-blue-400 rounded"></span>
-                  <span className="text-blue-800 font-medium">50-74: Good</span>
+                <li className="flex items-center gap-3">
+                  <span className="w-20 h-8 bg-yellow-300 border-2 border-yellow-500 rounded"></span>
+                  <span className="text-yellow-900 font-semibold">30-59: Fair</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-16 h-6 bg-orange-100 border-2 border-orange-400 rounded"></span>
-                  <span className="text-orange-800 font-medium">25-49: Fair</span>
+                <li className="flex items-center gap-3">
+                  <span className="w-20 h-8 bg-red-300 border-2 border-red-500 rounded"></span>
+                  <span className="text-red-900 font-semibold">1-29: Poor</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-16 h-6 bg-red-100 border-2 border-red-400 rounded"></span>
-                  <span className="text-red-800 font-medium">1-24: Poor</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-16 h-6 bg-gray-100 border-2 border-gray-400 rounded"></span>
-                  <span className="text-gray-600 font-medium">0: Closed</span>
+                <li className="flex items-center gap-3">
+                  <span className="w-20 h-8 bg-gray-200 border-2 border-gray-400 rounded"></span>
+                  <span className="text-gray-700 font-semibold">0: Closed</span>
                 </li>
               </ul>
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
