@@ -894,30 +894,9 @@ export default function TempelhoferBikeForecast() {
               )}
             </div>
             <div>
-              <h4 className="font-semibold text-gray-700 mb-3">Color Scale:</h4>
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm text-gray-600 w-8">100</span>
-                  <div className="flex-1 h-8 rounded border-2" style={{
-                    background: 'linear-gradient(to right, hsl(120, 65%, 75%), hsl(90, 65%, 75%), hsl(60, 70%, 72%), hsl(45, 70%, 72%), hsl(30, 75%, 70%), hsl(15, 75%, 70%), hsl(0, 75%, 70%))',
-                    borderColor: 'hsl(60, 75%, 55%)'
-                  }}></div>
-                  <span className="text-sm text-gray-600 w-8">1</span>
-                </div>
-                <div className="flex justify-between text-xs text-gray-600 px-8">
-                  <span>Green (Best)</span>
-                  <span>Yellow (70)</span>
-                  <span>Red (Worst)</span>
-                </div>
-              </div>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="flex items-center gap-3">
-                  <span className="w-16 h-6 bg-gray-200 border-2 border-gray-400 rounded"></span>
-                  <span className="text-gray-700 font-medium">0 = Closed</span>
-                </li>
-              </ul>
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-800">
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold text-blue-900 mb-2">Bonus Conditions</h4>
+                <p className="text-sm text-blue-800">
                   {activity === 'cycling' && <><strong>Sweet spot:</strong> 15-22°C temps get a +5 bonus</>}
                   {activity === 'jogging' && <><strong>Sweet spot:</strong> 12-20°C temps get a +5 bonus</>}
                   {activity === 'kiting' && <><strong>Wind is key:</strong> 4-7 m/s gives +30 bonus</>}
