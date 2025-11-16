@@ -9,10 +9,12 @@ export default function TempelhoferBikeForecast() {
   // Generate mock weather data
   const generateMockWeatherData = () => {
     const now = new Date();
+    // Start from midnight of today to ensure full days are shown
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     const hourly = [];
-    
+
     for (let i = 0; i < 168; i++) { // 7 days
-      const time = new Date(now.getTime() + i * 60 * 60 * 1000);
+      const time = new Date(startOfToday.getTime() + i * 60 * 60 * 1000);
       const hour = time.getHours();
       
       // Create realistic weather patterns
@@ -691,19 +693,19 @@ export default function TempelhoferBikeForecast() {
                 hour.weather[0].main
               );
 
-              const colors = !showGreyedOut && hour.score > 0 ? getScoreColor(hour.score) : {};
+              const colors = hour.score > 0 ? getScoreColor(hour.score) : {};
 
               return (
                 <div
                   key={hour.dt}
                   className={`border-2 rounded-lg p-1.5 transition-all hover:scale-105 ${
                     showGreyedOut
-                      ? 'border-gray-300 bg-gray-100 opacity-50'
+                      ? 'opacity-40'
                       : hour.score === 0
                       ? 'border-gray-300 bg-gray-50 opacity-40'
                       : ''
                   }`}
-                  style={!showGreyedOut && hour.score > 0 ? colors : {}}
+                  style={hour.score > 0 ? colors : {}}
                 >
                   <div className="flex flex-col items-center mb-0.5">
                     <div className={`text-[10px] font-semibold w-full text-center ${
