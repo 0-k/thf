@@ -4,21 +4,24 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 
 ## Project Status
 
-**Current State:** Proof of concept complete with mock data
-**Next Step:** Production deployment setup
+**Current State:** Production-ready with Vite + React + Netlify Functions
+**Next Step:** Add OpenWeatherMap API key and deploy to Netlify
 
 ## Tech Stack
 
-- **Frontend:** React with Tailwind CSS (single-file artifact)
-- **Data:** Mock weather generation OR OpenWeatherMap API
-- **Deployment Target:** Netlify (frontend) + PythonAnywhere (backend optional)
+- **Frontend:** React + Vite + Tailwind CSS
+- **Backend:** Netlify Functions (serverless)
+- **Data:** Mock weather generation (dev) OR OpenWeatherMap API (production)
+- **Deployment:** Netlify (all-in-one, 100% free)
 
 ## Key Files
 
-- `bike-forecast.jsx` - Main React app with activity switching
-- `weather_backend.py` - Flask backend for API key protection (optional)
-- `requirements.txt` - Python dependencies
-- OpenWeatherMap API key: `` (free tier, 1000 calls/day)
+- `src/App.jsx` - Main React app with 4 activities (cycling/jogging/kiting/picnic)
+- `netlify/functions/weather.js` - Serverless API endpoint for weather data
+- `netlify.toml` - Netlify deployment configuration
+- `.env` - Environment variables (API key)
+- `vite.config.js` - Vite bundler configuration
+- `tailwind.config.js` - Tailwind CSS configuration
 
 ## Architecture
 
@@ -50,23 +53,45 @@ Two separate scoring functions with different penalty scales:
 - All wind speeds in m/s
 - Score range: 0-100 (0 = closed)
 
-## Next Development Tasks
+## Local Development
 
-1. **Deployment Option 1 (Quick):**
-   - Modify app to fetch directly from OpenWeatherMap
-   - Deploy single-file React app to Netlify
-   - API key exposed but free tier limits protect
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-2. **Deployment Option 2 (Proper):**
-   - Deploy `weather_backend.py` to PythonAnywhere
-   - Update frontend `API_URL` to backend endpoint
-   - Deploy frontend to Netlify
-   - API key protected server-side
+2. **Set your API key in `.env`:**
+   ```
+   OPENWEATHER_API_KEY=your_key_here
+   ```
 
-3. **Future Activities:**
-   - Kite sports (inverted wind scoring!)
-   - Picnic/socializing (crowds = bonus)
-   - Each needs custom `calculate<Activity>Score()` function
+3. **Run locally (with mock data):**
+   ```bash
+   npm run dev
+   ```
+   Opens at http://localhost:3000
+
+4. **Run with Netlify Functions (test real API):**
+   ```bash
+   npm run netlify:dev
+   ```
+   Opens at http://localhost:8888
+
+## Deployment to Netlify
+
+1. Push code to GitHub
+2. Connect repository to Netlify
+3. Add environment variable: `OPENWEATHER_API_KEY`
+4. Deploy! (auto-builds on push)
+
+## Features Implemented
+
+- ✅ **4 Activities:** Cycling, Jogging, Kiting, Picnic
+- ✅ **Activity-specific scoring:** Each has unique penalty/bonus scales
+- ✅ **Mock data mode:** Works without API key for development
+- ✅ **Real API mode:** Fetches from OpenWeatherMap via Netlify Function
+- ✅ **Caching:** Backend caches for 1 hour to save API calls
+- ✅ **Responsive design:** Mobile-first with 2-row grid layout
 
 ## Important Context
 
