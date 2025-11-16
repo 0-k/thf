@@ -1,17 +1,17 @@
-# Tempelhofer Feld Activity Forecast 🚴 🏃 🪁 🧺
+# Tempelhofer Feld Activity Forecast
 
 A weather-based activity scoring app for Tempelhofer Feld in Berlin. Get hourly forecasts optimized for **cycling**, **jogging**, **kiting**, and **picnics** with intelligent, activity-specific scoring algorithms.
 
 ![Status](https://img.shields.io/badge/status-ready_to_deploy-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-## ✨ Features
+## Features
 
 - **4 Activity Types** with unique scoring algorithms:
-  - 🚴 **Cycling** - Penalizes wind, rain, and crowds
-  - 🏃 **Jogging** - Heat-sensitive, rain-tolerant
-  - 🪁 **Kiting** - NEEDS wind! Safety-focused crowd penalties
-  - 🧺 **Picnic** - Rain-averse, crowd-positive
+  - **Cycling** - Penalizes wind, rain, and crowds
+  - **Jogging** - Heat-sensitive, rain-tolerant
+  - **Kiting** - NEEDS wind! Safety-focused crowd penalties
+  - **Picnic** - Rain-averse, crowd-positive
 
 - **Smart Scoring** (0-100):
   - Continuous penalty scales (no step functions)
@@ -28,7 +28,7 @@ A weather-based activity scoring app for Tempelhofer Feld in Berlin. Get hourly 
   - Mock data for development
   - Real OpenWeatherMap API for production
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -72,7 +72,7 @@ The app works in mock mode by default. To enable real weather data:
 3. Add the key to your `.env` file
 4. Run `npm run netlify:dev`
 
-## 📦 Deployment to Netlify (100% Free)
+## Deployment to Netlify (100% Free)
 
 ### Step 1: Get an API Key
 
@@ -105,7 +105,7 @@ The app works in mock mode by default. To enable real weather data:
 
 Your site will be live at `https://your-site-name.netlify.app`
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 thf/
@@ -126,37 +126,37 @@ thf/
 └── package.json         # Dependencies and scripts
 ```
 
-## 🎯 How Scoring Works
+## How Scoring Works
 
 Each activity has a unique scoring algorithm with continuous penalty scales:
 
-### 🚴 Cycling
+### Cycling
 - **Rain**: -40 base (worst factor)
 - **Wind**: Up to -40 (starts at 3 m/s)
 - **Crowds**: Up to -25
 - **Temperature**: Optimal 15-22°C (+5 bonus)
 - **Opening hours**: Auto-zero when closed
 
-### 🏃 Jogging
+### Jogging
 - **Heat**: Up to -35 (more sensitive than cycling!)
 - **Rain**: -20 base (runners don't mind light rain)
 - **Wind**: Up to -15 (less affected than cycling)
 - **UV**: Starts penalizing at 4 (more exposure time)
 - **Temperature**: Optimal 12-20°C (+5 bonus)
 
-### 🪁 Kiting
+### Kiting
 - **Wind**: INVERTED! 4-7 m/s = +30 bonus
 - **Crowds**: Up to -35 (safety critical)
 - **Thunderstorms**: Instant zero (deadly combination)
 - **Low wind**: &lt;2 m/s = -50 penalty
 
-### 🧺 Picnic
+### Picnic
 - **Rain**: -60 base (worst for picnics!)
 - **Crowds**: +10 bonus (good atmosphere)
 - **Temperature**: Optimal 18-24°C (+10 bonus)
 - **Wind**: Moderate penalty (flies blankets)
 
-## 🔧 Tech Stack
+## Tech Stack
 
 - **Frontend**: React 19 + Vite 7
 - **Styling**: Tailwind CSS 4
@@ -165,7 +165,7 @@ Each activity has a unique scoring algorithm with continuous penalty scales:
 - **API**: OpenWeatherMap One Call 3.0
 - **Deployment**: Netlify (free tier)
 
-## 📊 API Endpoints
+## API Endpoints
 
 ### `/.netlify/functions/weather`
 
@@ -183,7 +183,7 @@ Each activity has a unique scoring algorithm with continuous penalty scales:
 
 **Caching:** 1 hour server-side cache to minimize API calls
 
-## 🧪 Scripts
+## Scripts
 
 ```bash
 npm run dev          # Start Vite dev server (mock data)
@@ -192,7 +192,7 @@ npm run preview      # Preview production build
 npm run netlify:dev  # Start Netlify dev server (with functions)
 ```
 
-## 🌍 Location
+## Location
 
 **Tempelhofer Feld, Berlin**
 - Coordinates: 52.4732°N, 13.4053°E
@@ -200,18 +200,18 @@ npm run netlify:dev  # Start Netlify dev server (with functions)
   - Summer (Apr-Sep): 6:00-22:00
   - Winter (Oct-Mar): 7:00-21:00
 
-## 🔒 Security & Rate Limits
+## Security & Rate Limits
 
 - API key stored server-side in Netlify environment
 - 1-hour caching reduces API calls
 - Free tier: 1000 calls/day
 - Estimated usage: ~24 calls/day (hourly refresh)
 
-## 📝 License
+## License
 
 MIT License - feel free to use and modify!
 
-## 🙏 Credits
+## Credits
 
 - Weather data: [OpenWeatherMap](https://openweathermap.org)
 - Icons: [Lucide](https://lucide.dev)
@@ -219,4 +219,4 @@ MIT License - feel free to use and modify!
 
 ---
 
-**Enjoy your activities at Tempelhofer Feld!** 🌤️
+**Enjoy your activities at Tempelhofer Feld!**

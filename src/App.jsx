@@ -224,14 +224,14 @@ export default function TempelhoferBikeForecast() {
       return 0; // Absolutely not safe
     }
     
-    // Rain penalty - less severe for jogging (many runners don't mind light rain)
+    // Rain penalty - slightly increased (still less than cycling)
     const pop = hourData.pop;
     if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score -= 20; // Half of cycling penalty
-      score -= pop * 10; // Less additional penalty
+      score -= 25;
+      score -= pop * 12;
     } else {
       if (pop > 0.3) {
-        score -= Math.pow((pop - 0.3) / 0.7, 1.5) * 15;
+        score -= Math.pow((pop - 0.3) / 0.7, 1.5) * 18;
       }
     }
     
@@ -319,13 +319,13 @@ export default function TempelhoferBikeForecast() {
       score -= 50; // Way too dangerous
     }
     
-    // Rain penalty - annoying but not terrible
+    // Rain penalty - more severe (wet equipment, visibility issues)
     const pop = hourData.pop;
     if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score -= 15;
-      score -= pop * 10;
+      score -= 30;
+      score -= pop * 15;
     } else if (pop > 0.3) {
-      score -= Math.pow((pop - 0.3) / 0.7, 1.5) * 10;
+      score -= Math.pow((pop - 0.3) / 0.7, 1.5) * 20;
     }
     
     // Crowd penalty - VERY IMPORTANT for safety
@@ -385,11 +385,11 @@ export default function TempelhoferBikeForecast() {
       }
     }
     
-    // Wind penalty - moderate (ruins setup, flies blankets)
+    // Wind penalty - same as cycling (gets annoying at THF)
     const windSpeed = hourData.wind_speed;
-    if (windSpeed > 4) {
-      const windPenalty = Math.pow((windSpeed - 4) / 8, 1.2) * 25;
-      score -= Math.min(25, windPenalty);
+    if (windSpeed > 3) {
+      const windPenalty = Math.pow((windSpeed - 3) / 7, 1.3) * 40;
+      score -= Math.min(40, windPenalty);
     }
     
     // Crowds - POSITIVE! Good atmosphere for socializing
@@ -528,10 +528,14 @@ export default function TempelhoferBikeForecast() {
   
   const dayGroups = groupHoursByDay(hoursWithScores);
   
-  // Get top 3 times from next 3 days only (72 hours)
+  // Get top 3 times from next 3 days only (72 hours) - exclude past hours
+  const now = new Date();
   const next3Days = hoursWithScores.slice(0, 72);
   const bestTimes = next3Days
-    .filter(h => h.score > 0)
+    .filter(h => {
+      const hourDate = new Date(h.dt * 1000);
+      return h.score > 0 && hourDate >= now; // Only future hours
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 
@@ -716,7 +720,7 @@ export default function TempelhoferBikeForecast() {
                     <div className={`text-lg font-bold leading-tight ${
                       showGreyedOut ? 'text-gray-400' : hour.score === 0 ? 'text-gray-400' : ''
                     }`}>
-                      {hour.score}
+                      {hour.score === 0 ? '-' : hour.score}
                     </div>
                   </div>
                   
