@@ -434,10 +434,10 @@ export default function TempelhoferBikeForecast() {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 75) return 'text-green-600 bg-green-50 border-green-300';
-    if (score >= 50) return 'text-yellow-600 bg-yellow-50 border-yellow-300';
-    if (score >= 25) return 'text-orange-600 bg-orange-50 border-orange-300';
-    return 'text-red-600 bg-red-50 border-red-300';
+    if (score >= 75) return 'text-green-800 bg-green-100 border-green-400';
+    if (score >= 50) return 'text-blue-800 bg-blue-100 border-blue-400';
+    if (score >= 25) return 'text-orange-800 bg-orange-100 border-orange-400';
+    return 'text-red-800 bg-red-100 border-red-400';
   };
 
   const getScoreLabel = (score) => {
@@ -498,19 +498,21 @@ export default function TempelhoferBikeForecast() {
     .slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                {activity === 'cycling' && '🚴 Tempelhofer Feld - Cycling'}
-                {activity === 'jogging' && '🏃 Tempelhofer Feld - Jogging'}
-                {activity === 'kiting' && '🪁 Tempelhofer Feld - Kiting'}
-                {activity === 'picnic' && '🧺 Tempelhofer Feld - Picnic'}
+                Tempelhofer Feld
               </h1>
-              <p className="text-gray-600">Hourly conditions for the next 7 days</p>
+              <p className="text-gray-600">
+                {activity === 'cycling' && 'Cycling Forecast - Next 7 days'}
+                {activity === 'jogging' && 'Jogging Forecast - Next 7 days'}
+                {activity === 'kiting' && 'Kiting Forecast - Next 7 days'}
+                {activity === 'picnic' && 'Picnic Forecast - Next 7 days'}
+              </p>
             </div>
             <button
               onClick={loadForecast}
@@ -523,46 +525,46 @@ export default function TempelhoferBikeForecast() {
           </div>
           
           {/* Activity Selector */}
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-6 bg-gray-100 p-1 rounded-xl inline-flex gap-1">
             <button
               onClick={() => setActivity('cycling')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
                 activity === 'cycling'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              🚴 Cycling
+              Cycling
             </button>
             <button
               onClick={() => setActivity('jogging')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
                 activity === 'jogging'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-green-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              🏃 Jogging
+              Jogging
             </button>
             <button
               onClick={() => setActivity('kiting')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
                 activity === 'kiting'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              🪁 Kiting
+              Kiting
             </button>
             <button
               onClick={() => setActivity('picnic')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
                 activity === 'picnic'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-orange-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              🧺 Picnic
+              Picnic
             </button>
           </div>
           
@@ -727,124 +729,124 @@ export default function TempelhoferBikeForecast() {
               {activity === 'cycling' ? (
                 <ul className="space-y-2 text-gray-600">
                   <li>
-                    <strong>⚡ Thunderstorms:</strong> Score = 0
+                    <strong>Thunderstorms:</strong> Score = 0
                     <div className="text-xs mt-1 ml-4">Not safe in exposed area</div>
                   </li>
                   <li>
-                    <strong>🌧️ Rain:</strong> -40 base + up to -20 for probability
+                    <strong>Rain:</strong> -40 base + up to -20 for probability
                     <div className="text-xs mt-1 ml-4">Active rain is worst, but high chance also penalized</div>
                   </li>
                   <li>
-                    <strong>💨 Wind:</strong> Gradual from 3 m/s
+                    <strong>Wind:</strong> Gradual from 3 m/s
                     <div className="text-xs mt-1 ml-4">5 m/s = -4, 7 m/s = -11, 10 m/s = -24, 13+ m/s = -40</div>
                   </li>
                   <li>
-                    <strong>👥 Crowds:</strong> Up to -25 points
+                    <strong>Crowds:</strong> Up to -25 points
                     <div className="text-xs mt-1 ml-4">Based on time, day, and weather</div>
                   </li>
                   <li>
-                    <strong>🥶 Cold:</strong> Gradual below 10°C
+                    <strong>Cold:</strong> Gradual below 10°C
                     <div className="text-xs mt-1 ml-4">5°C = -8, 0°C = -18, -5°C = -30</div>
                   </li>
                   <li>
-                    <strong>🥵 Hot:</strong> Gradual above 24°C
+                    <strong>Heat:</strong> Gradual above 24°C
                     <div className="text-xs mt-1 ml-4">26°C = -2, 28°C = -6, 32°C = -17, 35°C = -26</div>
                   </li>
                   <li>
-                    <strong>💨 Air Quality:</strong> AQI-based penalty
+                    <strong>Air Quality:</strong> AQI-based penalty
                     <div className="text-xs mt-1 ml-4">1=Good (0), 2=Fair (-5), 3=Moderate (-12), 4=Poor (-22)</div>
                   </li>
                   <li>
-                    <strong>☀️ UV Index:</strong> Gradual above 5
+                    <strong>UV Index:</strong> Gradual above 5
                     <div className="text-xs mt-1 ml-4">6 = -3, 8 = -10, 10 = -17, 11+ = -20</div>
                   </li>
                 </ul>
               ) : activity === 'jogging' ? (
                 <ul className="space-y-2 text-gray-600">
                   <li>
-                    <strong>⚡ Thunderstorms:</strong> Score = 0
+                    <strong>Thunderstorms:</strong> Score = 0
                     <div className="text-xs mt-1 ml-4">Not safe in exposed area</div>
                   </li>
                   <li>
-                    <strong>🌧️ Rain:</strong> -20 base + up to -10 for probability
+                    <strong>Rain:</strong> -20 base + up to -10 for probability
                     <div className="text-xs mt-1 ml-4">Many runners don't mind light rain</div>
                   </li>
                   <li>
-                    <strong>💨 Wind:</strong> Gradual from 5 m/s (max -15)
+                    <strong>Wind:</strong> Gradual from 5 m/s (max -15)
                     <div className="text-xs mt-1 ml-4">Much less affected than cycling</div>
                   </li>
                   <li>
-                    <strong>👥 Crowds:</strong> Up to -10 points
+                    <strong>Crowds:</strong> Up to -10 points
                     <div className="text-xs mt-1 ml-4">Easier to navigate than on a bike</div>
                   </li>
                   <li>
-                    <strong>🥶 Cold:</strong> Gradual below 10°C (max -20)
+                    <strong>Cold:</strong> Gradual below 10°C (max -20)
                     <div className="text-xs mt-1 ml-4">You warm up while running</div>
                   </li>
                   <li>
-                    <strong>🥵 Hot:</strong> Gradual above 22°C (max -35)
+                    <strong>Heat:</strong> Gradual above 22°C (max -35)
                     <div className="text-xs mt-1 ml-4">25°C = -8, 28°C = -18, 30°C = -27 (overheating risk!)</div>
                   </li>
                   <li>
-                    <strong>☀️ UV Index:</strong> Gradual above 4 (max -25)
+                    <strong>UV Index:</strong> Gradual above 4 (max -25)
                     <div className="text-xs mt-1 ml-4">More exposed, slower, longer duration</div>
                   </li>
                 </ul>
               ) : activity === 'kiting' ? (
                 <ul className="space-y-2 text-gray-600">
                   <li>
-                    <strong>⚡ Thunderstorms:</strong> Score = 0 (DEADLY!)
+                    <strong>Thunderstorms:</strong> Score = 0 (DEADLY!)
                     <div className="text-xs mt-1 ml-4">Metal frame + lightning = extreme danger</div>
                   </li>
                   <li>
-                    <strong>💨 Wind:</strong> NEEDS WIND! 4-7 m/s = +30
+                    <strong>Wind:</strong> NEEDS WIND! 4-7 m/s = +30
                     <div className="text-xs mt-1 ml-4">&lt;2 m/s = -50, &gt;12 m/s = -50 (too dangerous)</div>
                   </li>
                   <li>
-                    <strong>🌧️ Rain:</strong> -15 base + probability penalty
+                    <strong>Rain:</strong> -15 base + probability penalty
                     <div className="text-xs mt-1 ml-4">Annoying but manageable</div>
                   </li>
                   <li>
-                    <strong>👥 Crowds:</strong> Up to -35 points
+                    <strong>Crowds:</strong> Up to -35 points
                     <div className="text-xs mt-1 ml-4">SAFETY: Need space for kite</div>
                   </li>
                   <li>
-                    <strong>🥶 Cold:</strong> Below 5°C: -15
+                    <strong>Cold:</strong> Below 5°C: -15
                     <div className="text-xs mt-1 ml-4">Cold hands affect control</div>
                   </li>
                   <li>
-                    <strong>☀️ UV Index:</strong> Gradual above 5 (max -20)
+                    <strong>UV Index:</strong> Gradual above 5 (max -20)
                     <div className="text-xs mt-1 ml-4">Standing outside for hours</div>
                   </li>
                 </ul>
               ) : (
                 <ul className="space-y-2 text-gray-600">
                   <li>
-                    <strong>⚡ Thunderstorms:</strong> Score = 0
+                    <strong>Thunderstorms:</strong> Score = 0
                     <div className="text-xs mt-1 ml-4">Pack up and go home</div>
                   </li>
                   <li>
-                    <strong>🌧️ Rain:</strong> -60 base + up to -20 penalty
+                    <strong>Rain:</strong> -60 base + up to -20 penalty
                     <div className="text-xs mt-1 ml-4">Ruins food, blankets, everything</div>
                   </li>
                   <li>
-                    <strong>💨 Wind:</strong> Gradual above 4 m/s (max -25)
+                    <strong>Wind:</strong> Gradual above 4 m/s (max -25)
                     <div className="text-xs mt-1 ml-4">Flies blankets, ruins setup</div>
                   </li>
                   <li>
-                    <strong>👥 Crowds:</strong> +10 points (POSITIVE!)
+                    <strong>Crowds:</strong> +10 points (POSITIVE!)
                     <div className="text-xs mt-1 ml-4">Good atmosphere for socializing</div>
                   </li>
                   <li>
-                    <strong>🥶 Cold:</strong> Gradual below 12°C (max -25)
+                    <strong>Cold:</strong> Gradual below 12°C (max -25)
                     <div className="text-xs mt-1 ml-4">Uncomfortable sitting still</div>
                   </li>
                   <li>
-                    <strong>🥵 Hot:</strong> Gradual above 28°C (max -20)
+                    <strong>Heat:</strong> Gradual above 28°C (max -20)
                     <div className="text-xs mt-1 ml-4">Too hot for sitting in sun</div>
                   </li>
                   <li>
-                    <strong>☀️ UV Index:</strong> Gradual above 4 (max -30)
+                    <strong>UV Index:</strong> Gradual above 4 (max -30)
                     <div className="text-xs mt-1 ml-4">Sitting in sun for extended periods</div>
                   </li>
                 </ul>
@@ -853,18 +855,33 @@ export default function TempelhoferBikeForecast() {
             <div>
               <h4 className="font-semibold text-gray-700 mb-3">Score Ranges:</h4>
               <ul className="space-y-2">
-                <li className="text-green-600 font-medium">75-100: Excellent 🌟</li>
-                <li className="text-yellow-600 font-medium">50-74: Good ✓</li>
-                <li className="text-orange-600 font-medium">25-49: Fair ~</li>
-                <li className="text-red-600 font-medium">1-24: Poor ✗</li>
-                <li className="text-gray-500 font-medium">0: Closed 🔒</li>
+                <li className="flex items-center gap-2">
+                  <span className="w-16 h-6 bg-green-100 border-2 border-green-400 rounded"></span>
+                  <span className="text-green-800 font-medium">75-100: Excellent</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-16 h-6 bg-blue-100 border-2 border-blue-400 rounded"></span>
+                  <span className="text-blue-800 font-medium">50-74: Good</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-16 h-6 bg-orange-100 border-2 border-orange-400 rounded"></span>
+                  <span className="text-orange-800 font-medium">25-49: Fair</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-16 h-6 bg-red-100 border-2 border-red-400 rounded"></span>
+                  <span className="text-red-800 font-medium">1-24: Poor</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-16 h-6 bg-gray-100 border-2 border-gray-400 rounded"></span>
+                  <span className="text-gray-600 font-medium">0: Closed</span>
+                </li>
               </ul>
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-xs text-blue-800">
-                  {activity === 'cycling' && <><strong>Sweet spot:</strong> 15-22°C temps get a +5 bonus! 🎯</>}
-                  {activity === 'jogging' && <><strong>Sweet spot:</strong> 12-20°C temps get a +5 bonus! 🎯</>}
-                  {activity === 'kiting' && <><strong>Wind is key:</strong> 4-7 m/s gives +30 bonus! 💨</>}
-                  {activity === 'picnic' && <><strong>Sweet spot:</strong> 18-24°C temps get a +10 bonus! 🎯</>}
+                  {activity === 'cycling' && <><strong>Sweet spot:</strong> 15-22°C temps get a +5 bonus</>}
+                  {activity === 'jogging' && <><strong>Sweet spot:</strong> 12-20°C temps get a +5 bonus</>}
+                  {activity === 'kiting' && <><strong>Wind is key:</strong> 4-7 m/s gives +30 bonus</>}
+                  {activity === 'picnic' && <><strong>Sweet spot:</strong> 18-24°C temps get a +10 bonus</>}
                 </p>
               </div>
             </div>
