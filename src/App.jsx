@@ -434,16 +434,53 @@ export default function TempelhoferBikeForecast() {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 60) return 'text-green-900 bg-green-300 border-green-500';
-    if (score >= 30) return 'text-yellow-900 bg-yellow-300 border-yellow-500';
-    if (score >= 1) return 'text-red-900 bg-red-300 border-red-500';
-    return 'text-gray-700 bg-gray-200 border-gray-400';
+    if (score === 0) {
+      // Closed - grey
+      return {
+        backgroundColor: 'rgb(229, 231, 235)', // gray-200
+        borderColor: 'rgb(156, 163, 175)', // gray-400
+        color: 'rgb(55, 65, 81)' // gray-700
+      };
+    }
+
+    // Continuous gradient from green (100) → yellow (70) → red (1)
+    // Using HSL for smooth color transitions
+    let hue, saturation, lightness;
+
+    if (score >= 70) {
+      // Green to Yellow (100 → 70)
+      // Hue: 120 (green) → 60 (yellow)
+      const t = (score - 70) / 30;
+      hue = 60 + t * 60;
+      saturation = 65;
+      lightness = 75;
+    } else if (score >= 35) {
+      // Yellow to Orange (70 → 35)
+      // Hue: 60 (yellow) → 30 (orange)
+      const t = (score - 35) / 35;
+      hue = 30 + t * 30;
+      saturation = 70;
+      lightness = 72;
+    } else {
+      // Orange to Red (35 → 1)
+      // Hue: 30 (orange) → 0 (red)
+      const t = (score - 1) / 34;
+      hue = 0 + t * 30;
+      saturation = 75;
+      lightness = 70;
+    }
+
+    return {
+      backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+      borderColor: `hsl(${hue}, ${saturation + 10}%, ${lightness - 20}%)`,
+      color: `hsl(${hue}, ${saturation}%, 25%)`
+    };
   };
 
   const getScoreLabel = (score) => {
     if (score === 0) return 'Closed';
-    if (score >= 60) return 'Good';
-    if (score >= 30) return 'Fair';
+    if (score >= 70) return 'Good';
+    if (score >= 35) return 'Fair';
     return 'Poor';
   };
 
@@ -584,11 +621,13 @@ export default function TempelhoferBikeForecast() {
             <div className="grid grid-cols-3 gap-4">
               {bestTimes.map((hour, idx) => {
                 const date = new Date(hour.dt * 1000);
+                const colors = getScoreColor(hour.score);
                 return (
                   <div key={idx} className="flex flex-col items-center">
                     <div className="text-sm text-gray-500 mb-2">#{idx + 1}</div>
                     <div
-                      className={`border-2 rounded-lg p-1.5 transition-all ${getScoreColor(hour.score)}`}
+                      className="border-2 rounded-lg p-1.5 transition-all"
+                      style={colors}
                     >
                       <div className="flex flex-col items-center mb-0.5">
                         <div className="text-[10px] font-medium text-gray-600 mb-0.5 whitespace-nowrap">
@@ -652,16 +691,19 @@ export default function TempelhoferBikeForecast() {
                 hour.weather[0].main
               );
 
+              const colors = !showGreyedOut && hour.score > 0 ? getScoreColor(hour.score) : {};
+
               return (
                 <div
                   key={hour.dt}
                   className={`border-2 rounded-lg p-1.5 transition-all hover:scale-105 ${
                     showGreyedOut
                       ? 'border-gray-300 bg-gray-100 opacity-50'
-                      : hour.score === 0 
-                      ? 'border-gray-300 bg-gray-50 opacity-40' 
-                      : getScoreColor(hour.score)
+                      : hour.score === 0
+                      ? 'border-gray-300 bg-gray-50 opacity-40'
+                      : ''
                   }`}
+                  style={!showGreyedOut && hour.score > 0 ? colors : {}}
                 >
                   <div className="flex flex-col items-center mb-0.5">
                     <div className={`text-[10px] font-semibold w-full text-center ${
@@ -852,23 +894,26 @@ export default function TempelhoferBikeForecast() {
               )}
             </div>
             <div>
-              <h4 className="font-semibold text-gray-700 mb-3">Score Ranges:</h4>
-              <ul className="space-y-3">
+              <h4 className="font-semibold text-gray-700 mb-3">Color Scale:</h4>
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm text-gray-600 w-8">100</span>
+                  <div className="flex-1 h-8 rounded border-2" style={{
+                    background: 'linear-gradient(to right, hsl(120, 65%, 75%), hsl(90, 65%, 75%), hsl(60, 70%, 72%), hsl(45, 70%, 72%), hsl(30, 75%, 70%), hsl(15, 75%, 70%), hsl(0, 75%, 70%))',
+                    borderColor: 'hsl(60, 75%, 55%)'
+                  }}></div>
+                  <span className="text-sm text-gray-600 w-8">1</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-600 px-8">
+                  <span>Green (Best)</span>
+                  <span>Yellow (70)</span>
+                  <span>Red (Worst)</span>
+                </div>
+              </div>
+              <ul className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-center gap-3">
-                  <span className="w-20 h-8 bg-green-300 border-2 border-green-500 rounded"></span>
-                  <span className="text-green-900 font-semibold">60-100: Good</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <span className="w-20 h-8 bg-yellow-300 border-2 border-yellow-500 rounded"></span>
-                  <span className="text-yellow-900 font-semibold">30-59: Fair</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <span className="w-20 h-8 bg-red-300 border-2 border-red-500 rounded"></span>
-                  <span className="text-red-900 font-semibold">1-29: Poor</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <span className="w-20 h-8 bg-gray-200 border-2 border-gray-400 rounded"></span>
-                  <span className="text-gray-700 font-semibold">0: Closed</span>
+                  <span className="w-16 h-6 bg-gray-200 border-2 border-gray-400 rounded"></span>
+                  <span className="text-gray-700 font-medium">0 = Closed</span>
                 </li>
               </ul>
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
