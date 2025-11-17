@@ -6,6 +6,7 @@ export default function TempelhoferBikeForecast() {
   const [loading, setLoading] = useState(false);
   const [activity, setActivity] = useState('cycling');
   const [usingMockData, setUsingMockData] = useState(false);
+  const [selectedHour, setSelectedHour] = useState(null);
 
   // Generate mock weather data
   const generateMockWeatherData = () => {
@@ -562,6 +563,193 @@ export default function TempelhoferBikeForecast() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4">
+      {/* Detail Modal */}
+      {selectedHour && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedHour(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    {new Date(selectedHour.dt * 1000).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </h2>
+                  <p className="text-lg text-gray-600">
+                    {new Date(selectedHour.dt * 1000).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedHour(null)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Score */}
+              <div className="mb-6">
+                <div
+                  className="inline-block px-6 py-3 rounded-lg border-2"
+                  style={selectedHour.score > 0 ? getScoreColor(selectedHour.score) : {
+                    backgroundColor: 'rgb(229, 231, 235)',
+                    borderColor: 'rgb(156, 163, 175)',
+                    color: 'rgb(55, 65, 81)'
+                  }}
+                >
+                  <div className="text-sm font-medium opacity-80">
+                    {activity.charAt(0).toUpperCase() + activity.slice(1)} Score
+                  </div>
+                  <div className="text-4xl font-bold">
+                    {selectedHour.score === 0 ? 'Closed' : selectedHour.score}
+                  </div>
+                  <div className="text-sm opacity-80">
+                    {getScoreLabel(selectedHour.score)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Weather Details */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <ThermometerSun className="w-5 h-5" />
+                    <span className="font-medium">Temperature</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {Math.round(selectedHour.temp)}°C
+                  </div>
+                  {selectedHour.feels_like && (
+                    <div className="text-sm text-gray-600">
+                      Feels like {Math.round(selectedHour.feels_like)}°C
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <Wind className="w-5 h-5" />
+                    <span className="font-medium">Wind</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {Math.round(selectedHour.wind_speed)} m/s
+                  </div>
+                  {selectedHour.wind_gust && selectedHour.wind_gust > selectedHour.wind_speed && (
+                    <div className="text-sm text-gray-600">
+                      Gusts up to {Math.round(selectedHour.wind_gust)} m/s
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <Droplets className="w-5 h-5" />
+                    <span className="font-medium">Precipitation</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {Math.round(selectedHour.pop * 100)}%
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {selectedHour.weather[0].description}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <Cloud className="w-5 h-5" />
+                    <span className="font-medium">Air Quality</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    AQI {selectedHour.air_quality?.aqi || 'N/A'}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {selectedHour.air_quality?.aqi === 1 && 'Good'}
+                    {selectedHour.air_quality?.aqi === 2 && 'Fair'}
+                    {selectedHour.air_quality?.aqi === 3 && 'Moderate'}
+                    {selectedHour.air_quality?.aqi === 4 && 'Poor'}
+                    {selectedHour.air_quality?.aqi === 5 && 'Very Poor'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Details */}
+              <div className="border-t pt-4 space-y-3">
+                <h3 className="font-semibold text-gray-800 mb-3">Additional Details</h3>
+
+                {selectedHour.uvi !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">UV Index</span>
+                    <span className="font-medium text-gray-800">
+                      {selectedHour.uvi.toFixed(1)}
+                    </span>
+                  </div>
+                )}
+
+                {selectedHour.humidity !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Humidity</span>
+                    <span className="font-medium text-gray-800">
+                      {selectedHour.humidity}%
+                    </span>
+                  </div>
+                )}
+
+                {selectedHour.pressure !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Pressure</span>
+                    <span className="font-medium text-gray-800">
+                      {selectedHour.pressure} hPa
+                    </span>
+                  </div>
+                )}
+
+                {selectedHour.clouds !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Cloud Cover</span>
+                    <span className="font-medium text-gray-800">
+                      {selectedHour.clouds}%
+                    </span>
+                  </div>
+                )}
+
+                {selectedHour.visibility !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Visibility</span>
+                    <span className="font-medium text-gray-800">
+                      {(selectedHour.visibility / 1000).toFixed(1)} km
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Estimated Crowds</span>
+                  <span className="font-medium text-gray-800">
+                    {calculateCrowdFactor(
+                      new Date(selectedHour.dt * 1000).getHours(),
+                      new Date(selectedHour.dt * 1000).getDay(),
+                      selectedHour.temp,
+                      selectedHour.weather[0].main
+                    ).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -663,7 +851,8 @@ export default function TempelhoferBikeForecast() {
                   <div key={idx} className="flex flex-col items-center">
                     <div className="text-sm text-gray-500 mb-2">#{idx + 1}</div>
                     <div
-                      className="border-2 rounded-lg p-1.5 transition-all"
+                      onClick={() => setSelectedHour(hour)}
+                      className="border-2 rounded-lg p-1.5 transition-all hover:scale-105 cursor-pointer"
                       style={colors}
                     >
                       <div className="flex flex-col items-center mb-0.5">
@@ -733,7 +922,8 @@ export default function TempelhoferBikeForecast() {
               return (
                 <div
                   key={hour.dt}
-                  className={`border-2 rounded-lg p-1.5 transition-all hover:scale-105 ${
+                  onClick={() => setSelectedHour(hour)}
+                  className={`border-2 rounded-lg p-1.5 transition-all hover:scale-105 cursor-pointer ${
                     showGreyedOut
                       ? 'opacity-40'
                       : hour.score === 0
