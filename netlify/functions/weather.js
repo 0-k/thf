@@ -75,7 +75,9 @@ exports.handler = async function(event, context) {
       };
     }
 
-    const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${TEMPELHOFER_LAT}&lon=${TEMPELHOFER_LON}&exclude=minutely,current,alerts&units=metric&appid=${apiKey}`;
+    // Using One Call API 2.5 (free tier - gives 48 hours of forecast)
+    // Note: 3.0 requires payment despite "free tier" claims
+    const url = `https://api.openweathermap.org/data/2.5/onecall?lat=${TEMPELHOFER_LAT}&lon=${TEMPELHOFER_LON}&exclude=minutely,current,alerts&units=metric&appid=${apiKey}`;
 
     console.log('Fetching fresh weather data...');
     const response = await fetch(url);
