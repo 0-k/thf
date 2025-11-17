@@ -4,7 +4,8 @@ import { Cloud, Wind, Droplets, ThermometerSun, Users, TrendingUp, RefreshCw } f
 export default function TempelhoferBikeForecast() {
   const [forecastData, setForecastData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [activity, setActivity] = useState('cycling'); // 'cycling' or 'jogging'
+  const [activity, setActivity] = useState('cycling');
+  const [usingMockData, setUsingMockData] = useState(false);
 
   // Generate mock weather data
   const generateMockWeatherData = () => {
@@ -486,10 +487,30 @@ export default function TempelhoferBikeForecast() {
     return 'Poor';
   };
 
-  const loadForecast = () => {
+  const loadForecast = async () => {
     setLoading(true);
+
+    try {
+      // Try to fetch real weather data from Netlify function
+      const response = await fetch('/.netlify/functions/weather');
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setForecastData(result.data);
+          setUsingMockData(false);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('Failed to fetch real weather data, using mock data:', error.message);
+    }
+
+    // Fallback to mock data if API fetch fails
     setTimeout(() => {
       setForecastData(generateMockWeatherData());
+      setUsingMockData(true);
       setLoading(false);
     }, 500);
   };
@@ -610,11 +631,21 @@ export default function TempelhoferBikeForecast() {
             </button>
           </div>
           
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              <strong>Demo Mode:</strong> Showing mock weather and air quality data. In production, this would use real data from OpenWeatherMap.
-            </p>
-          </div>
+          {usingMockData && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Mock Data:</strong> Using simulated weather data. Add an OpenWeatherMap API key to see real forecasts.
+              </p>
+            </div>
+          )}
+
+          {!usingMockData && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                <strong>Live Data:</strong> Showing real weather forecast from OpenWeatherMap.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Best Times */}
