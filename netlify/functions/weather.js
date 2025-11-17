@@ -75,26 +75,82 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Using One Call API 2.5 (free tier - gives 48 hours of forecast)
-    // Note: 3.0 requires payment despite "free tier" claims
-    const url = `https://api.openweathermap.org/data/2.5/onecall?lat=${TEMPELHOFER_LAT}&lon=${TEMPELHOFER_LON}&exclude=minutely,current,alerts&units=metric&appid=${apiKey}`;
+    // Using basic free APIs - no subscription needed, works immediately
+    // Fetch current weather + 5-day/3-hour forecast
+    const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${TEMPELHOFER_LAT}&lon=${TEMPELHOFER_LON}&units=metric&appid=${apiKey}`;
+    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${TEMPELHOFER_LAT}&lon=${TEMPELHOFER_LON}&units=metric&appid=${apiKey}`;
 
-    console.log('Fetching fresh weather data...');
-    const response = await fetch(url);
+    console.log('Fetching weather data from basic free API...');
 
-    if (!response.ok) {
-      console.error('OpenWeatherMap API error:', response.status);
+    const [currentResponse, forecastResponse] = await Promise.all([
+      fetch(currentUrl),
+      fetch(forecastUrl)
+    ]);
+
+    if (!currentResponse.ok) {
+      console.error('Current weather API error:', currentResponse.status);
+      const errorText = await currentResponse.text();
+      console.error('Error details:', errorText);
       return {
-        statusCode: response.status,
+        statusCode: currentResponse.status,
         headers,
         body: JSON.stringify({
           success: false,
-          error: `Weather API returned ${response.status}`
+          error: `Current weather API returned ${currentResponse.status}`,
+          details: errorText
         })
       };
     }
 
-    const weatherData = await response.json();
+    if (!forecastResponse.ok) {
+      console.error('Forecast API error:', forecastResponse.status);
+      return {
+        statusCode: forecastResponse.status,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: `Forecast API returned ${forecastResponse.status}`
+        })
+      };
+    }
+
+    const currentData = await currentResponse.json();
+    const forecastData = await forecastResponse.json();
+
+    // Convert to One Call API format for compatibility
+    // Forecast API gives 3-hour intervals for 5 days (40 data points)
+    const hourly = forecastData.list.map(item => ({
+      dt: item.dt,
+      temp: item.main.temp,
+      feels_like: item.main.feels_like,
+      pressure: item.main.pressure,
+      humidity: item.main.humidity,
+      dew_point: item.main.temp - ((100 - item.main.humidity) / 5), // approximation
+      uvi: 0, // Not available in free API
+      clouds: item.clouds.all,
+      visibility: item.visibility || 10000,
+      wind_speed: item.wind.speed,
+      wind_deg: item.wind.deg,
+      wind_gust: item.wind.gust || item.wind.speed,
+      weather: item.weather,
+      pop: item.pop || 0,
+      rain: item.rain ? { '3h': item.rain['3h'] || 0 } : undefined,
+      snow: item.snow ? { '3h': item.snow['3h'] || 0 } : undefined,
+      air_quality: { aqi: 2 } // Mock AQI since not available
+    }));
+
+    const weatherData = {
+      lat: TEMPELHOFER_LAT,
+      lon: TEMPELHOFER_LON,
+      timezone: 'Europe/Berlin',
+      timezone_offset: 3600,
+      current: {
+        dt: currentData.dt,
+        temp: currentData.main.temp,
+        weather: currentData.weather
+      },
+      hourly: hourly
+    };
 
     // Update cache
     cache.data = weatherData;
