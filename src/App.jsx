@@ -573,18 +573,18 @@ export default function TempelhoferBikeForecast() {
             className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6">
+            <div className="p-4">
               {/* Header */}
-              <div className="flex justify-between items-start mb-6">
+              <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800">
+                  <h2 className="text-lg font-bold text-gray-800">
                     {new Date(selectedHour.dt * 1000).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      month: 'long',
+                      weekday: 'short',
+                      month: 'short',
                       day: 'numeric'
                     })}
                   </h2>
-                  <p className="text-lg text-gray-600">
+                  <p className="text-sm text-gray-600">
                     {new Date(selectedHour.dt * 1000).toLocaleTimeString('en-US', {
                       hour: '2-digit',
                       minute: '2-digit'
@@ -593,88 +593,88 @@ export default function TempelhoferBikeForecast() {
                 </div>
                 <button
                   onClick={() => setSelectedHour(null)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                  className="text-gray-400 hover:text-gray-600 text-xl font-bold -mt-1"
                 >
                   ×
                 </button>
               </div>
 
               {/* Score */}
-              <div className="mb-6">
+              <div className="mb-3">
                 <div
-                  className="inline-block px-6 py-3 rounded-lg border-2"
+                  className="inline-block px-4 py-2 rounded-lg border-2"
                   style={selectedHour.score > 0 ? getScoreColor(selectedHour.score) : {
                     backgroundColor: 'rgb(229, 231, 235)',
                     borderColor: 'rgb(156, 163, 175)',
                     color: 'rgb(55, 65, 81)'
                   }}
                 >
-                  <div className="text-sm font-medium opacity-80">
+                  <div className="text-xs font-medium opacity-80">
                     {activity.charAt(0).toUpperCase() + activity.slice(1)} Score
                   </div>
-                  <div className="text-4xl font-bold">
+                  <div className="text-3xl font-bold">
                     {selectedHour.score === 0 ? 'Closed' : selectedHour.score}
                   </div>
-                  <div className="text-sm opacity-80">
+                  <div className="text-xs opacity-80">
                     {getScoreLabel(selectedHour.score)}
                   </div>
                 </div>
               </div>
 
               {/* Weather Details */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <ThermometerSun className="w-5 h-5" />
-                    <span className="font-medium">Temperature</span>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <div className="flex items-center gap-1 text-gray-600 mb-0.5">
+                    <ThermometerSun className="w-4 h-4" />
+                    <span className="text-xs font-medium">Temperature</span>
                   </div>
-                  <div className="text-2xl font-bold text-gray-800">
+                  <div className="text-xl font-bold text-gray-800">
                     {Math.round(selectedHour.temp)}°C
                   </div>
                   {selectedHour.feels_like && (
-                    <div className="text-sm text-gray-600">
-                      Feels like {Math.round(selectedHour.feels_like)}°C
+                    <div className="text-xs text-gray-600">
+                      Feels {Math.round(selectedHour.feels_like)}°C
                     </div>
                   )}
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <Wind className="w-5 h-5" />
-                    <span className="font-medium">Wind</span>
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <div className="flex items-center gap-1 text-gray-600 mb-0.5">
+                    <Wind className="w-4 h-4" />
+                    <span className="text-xs font-medium">Wind</span>
                   </div>
-                  <div className="text-2xl font-bold text-gray-800">
+                  <div className="text-xl font-bold text-gray-800">
                     {Math.round(selectedHour.wind_speed)} m/s
                   </div>
                   {selectedHour.wind_gust && selectedHour.wind_gust > selectedHour.wind_speed && (
-                    <div className="text-sm text-gray-600">
-                      Gusts up to {Math.round(selectedHour.wind_gust)} m/s
+                    <div className="text-xs text-gray-600">
+                      Gusts {Math.round(selectedHour.wind_gust)} m/s
                     </div>
                   )}
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <Droplets className="w-5 h-5" />
-                    <span className="font-medium">Precipitation</span>
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <div className="flex items-center gap-1 text-gray-600 mb-0.5">
+                    <Droplets className="w-4 h-4" />
+                    <span className="text-xs font-medium">Precipitation</span>
                   </div>
-                  <div className="text-2xl font-bold text-gray-800">
+                  <div className="text-xl font-bold text-gray-800">
                     {Math.round(selectedHour.pop * 100)}%
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-xs text-gray-600 truncate">
                     {selectedHour.weather[0].description}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <Cloud className="w-5 h-5" />
-                    <span className="font-medium">Air Quality</span>
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <div className="flex items-center gap-1 text-gray-600 mb-0.5">
+                    <Cloud className="w-4 h-4" />
+                    <span className="text-xs font-medium">Air Quality</span>
                   </div>
-                  <div className="text-2xl font-bold text-gray-800">
+                  <div className="text-xl font-bold text-gray-800">
                     AQI {selectedHour.air_quality?.aqi || 'N/A'}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-xs text-gray-600">
                     {selectedHour.air_quality?.aqi === 1 && 'Good'}
                     {selectedHour.air_quality?.aqi === 2 && 'Fair'}
                     {selectedHour.air_quality?.aqi === 3 && 'Moderate'}
@@ -685,11 +685,11 @@ export default function TempelhoferBikeForecast() {
               </div>
 
               {/* Additional Details */}
-              <div className="border-t pt-4 space-y-3">
-                <h3 className="font-semibold text-gray-800 mb-3">Additional Details</h3>
+              <div className="border-t pt-2 space-y-1">
+                <h3 className="font-semibold text-xs text-gray-700 mb-1.5">Additional Details</h3>
 
                 {selectedHour.uvi !== undefined && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-xs">
                     <span className="text-gray-600">UV Index</span>
                     <span className="font-medium text-gray-800">
                       {selectedHour.uvi.toFixed(1)}
@@ -698,7 +698,7 @@ export default function TempelhoferBikeForecast() {
                 )}
 
                 {selectedHour.humidity !== undefined && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Humidity</span>
                     <span className="font-medium text-gray-800">
                       {selectedHour.humidity}%
@@ -707,7 +707,7 @@ export default function TempelhoferBikeForecast() {
                 )}
 
                 {selectedHour.pressure !== undefined && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Pressure</span>
                     <span className="font-medium text-gray-800">
                       {selectedHour.pressure} hPa
@@ -716,7 +716,7 @@ export default function TempelhoferBikeForecast() {
                 )}
 
                 {selectedHour.clouds !== undefined && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Cloud Cover</span>
                     <span className="font-medium text-gray-800">
                       {selectedHour.clouds}%
@@ -725,7 +725,7 @@ export default function TempelhoferBikeForecast() {
                 )}
 
                 {selectedHour.visibility !== undefined && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Visibility</span>
                     <span className="font-medium text-gray-800">
                       {(selectedHour.visibility / 1000).toFixed(1)} km
@@ -733,7 +733,7 @@ export default function TempelhoferBikeForecast() {
                   </div>
                 )}
 
-                <div className="flex justify-between">
+                <div className="flex justify-between text-xs">
                   <span className="text-gray-600">Estimated Crowds</span>
                   <span className="font-medium text-gray-800">
                     {calculateCrowdFactor(
@@ -776,10 +776,10 @@ export default function TempelhoferBikeForecast() {
           </div>
           
           {/* Activity Selector */}
-          <div className="mt-6 bg-gray-100 p-1 rounded-xl inline-flex gap-1">
+          <div className="mt-6 bg-gray-100 p-1 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-1 max-w-2xl">
             <button
               onClick={() => setActivity('cycling')}
-              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
+              className={`px-4 py-2.5 rounded-lg font-semibold transition-all text-sm md:text-base ${
                 activity === 'cycling'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
@@ -789,7 +789,7 @@ export default function TempelhoferBikeForecast() {
             </button>
             <button
               onClick={() => setActivity('jogging')}
-              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
+              className={`px-4 py-2.5 rounded-lg font-semibold transition-all text-sm md:text-base ${
                 activity === 'jogging'
                   ? 'bg-green-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
@@ -799,7 +799,7 @@ export default function TempelhoferBikeForecast() {
             </button>
             <button
               onClick={() => setActivity('kiting')}
-              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
+              className={`px-4 py-2.5 rounded-lg font-semibold transition-all text-sm md:text-base ${
                 activity === 'kiting'
                   ? 'bg-purple-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
@@ -809,7 +809,7 @@ export default function TempelhoferBikeForecast() {
             </button>
             <button
               onClick={() => setActivity('picnic')}
-              className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
+              className={`px-4 py-2.5 rounded-lg font-semibold transition-all text-sm md:text-base ${
                 activity === 'picnic'
                   ? 'bg-orange-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
