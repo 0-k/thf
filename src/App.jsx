@@ -34,7 +34,7 @@ const SCORING_CONFIG = {
       veryHighPenalty: -50, veryHighThreshold: 12
     },
     crowd: { multiplier: 0.35 },
-    cold: { threshold: 8, maxPenalty: 25, range: 8, exponent: 1.3 },
+    cold: { threshold: 10, maxPenalty: 40, range: 10, exponent: 1.4 },
     heat: { threshold: 30, flatPenalty: -10 },
     airQuality: { threshold: 2, maxPenalty: 15, range: 3, exponent: 1.3 },
     uv: { threshold: 5, maxPenalty: 20, range: 6, exponent: 1.2 }
@@ -1121,8 +1121,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">SAFETY: Need space for kite</div>
                   </li>
                   <li>
-                    <strong>Cold:</strong> Gradual below 8°C (max -25)
-                    <div className="text-xs mt-1 ml-4">Cold hands affect control</div>
+                    <strong>Cold:</strong> Gradual below 10°C (max -40)
+                    <div className="text-xs mt-1 ml-4">5°C = -18, 0°C = -32, -5°C = -40 (cold hands hurt control)</div>
                   </li>
                   <li>
                     <strong>UV Index:</strong> Gradual above 5 (max -20)
