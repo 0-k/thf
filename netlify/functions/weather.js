@@ -139,6 +139,41 @@ exports.handler = async function(event, context) {
       air_quality: { aqi: 2 } // Mock AQI since not available
     }));
 
+    // Backfill past hours of today (from midnight to current hour)
+    // Free API doesn't provide historical data, so we interpolate from current conditions
+    const nowTimestamp = currentData.dt;
+    const nowDate = new Date(nowTimestamp * 1000);
+    const midnightToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), 0, 0, 0);
+    const midnightTimestamp = Math.floor(midnightToday.getTime() / 1000);
+
+    const pastHours = [];
+    for (let ts = midnightTimestamp; ts < nowTimestamp; ts += 3600) {
+      // Interpolate temperature (slightly cooler in early morning)
+      const hour = new Date(ts * 1000).getHours();
+      const tempVariation = hour < 6 ? -2 : (hour < 12 ? -1 : 0);
+
+      pastHours.push({
+        dt: ts,
+        temp: currentData.main.temp + tempVariation,
+        feels_like: currentData.main.feels_like + tempVariation,
+        pressure: currentData.main.pressure,
+        humidity: currentData.main.humidity,
+        dew_point: currentData.main.temp - ((100 - currentData.main.humidity) / 5),
+        uvi: 0,
+        clouds: currentData.clouds.all,
+        visibility: currentData.visibility || 10000,
+        wind_speed: currentData.wind.speed * (hour < 6 ? 0.7 : 0.9),
+        wind_deg: currentData.wind.deg,
+        wind_gust: currentData.wind.gust || currentData.wind.speed,
+        weather: currentData.weather,
+        pop: 0,
+        air_quality: { aqi: 2 }
+      });
+    }
+
+    // Combine past hours + current + future forecast
+    const allHourly = [...pastHours, ...hourly];
+
     const weatherData = {
       lat: TEMPELHOFER_LAT,
       lon: TEMPELHOFER_LON,
@@ -149,7 +184,7 @@ exports.handler = async function(event, context) {
         temp: currentData.main.temp,
         weather: currentData.weather
       },
-      hourly: hourly
+      hourly: allHourly
     };
 
     // Update cache

@@ -28,7 +28,7 @@ const SCORING_CONFIG = {
     wind: {
       veryLowPenalty: -50, veryLowThreshold: 2,
       lowPenalty: -30, lowThreshold: 4,
-      optimalMin: 4, optimalMax: 7, optimalBonus: 30,
+      optimalMin: 4, optimalMax: 7, optimalBonus: 20,
       goodMin: 7, goodMax: 10, goodBonus: 10,
       highPenalty: -20, highThreshold: 10, highMax: 12,
       veryHighPenalty: -50, veryHighThreshold: 12
@@ -1109,7 +1109,7 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Metal frame + lightning = extreme danger</div>
                   </li>
                   <li>
-                    <strong>Wind:</strong> NEEDS WIND! 4-7 m/s = +30
+                    <strong>Wind:</strong> NEEDS WIND! 4-7 m/s = +20
                     <div className="text-xs mt-1 ml-4">&lt;2 m/s = -50, &gt;12 m/s = -50 (too dangerous)</div>
                   </li>
                   <li>
