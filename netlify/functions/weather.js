@@ -108,6 +108,7 @@ exports.handler = async function(event, context) {
     ].join(','));
     forecastUrl.searchParams.set('timezone', 'Europe/Berlin');
     forecastUrl.searchParams.set('forecast_days', '7');
+    forecastUrl.searchParams.set('wind_speed_unit', 'ms'); // Get m/s instead of km/h
 
     // Fetch past 24 hours for today's historical data
     const today = new Date();
@@ -134,6 +135,7 @@ exports.handler = async function(event, context) {
     historicalUrl.searchParams.set('timezone', 'Europe/Berlin');
     historicalUrl.searchParams.set('past_days', '1');
     historicalUrl.searchParams.set('forecast_days', '1');
+    historicalUrl.searchParams.set('wind_speed_unit', 'ms'); // Get m/s instead of km/h
 
     console.log('Fetching weather data from Open-Meteo...');
 
