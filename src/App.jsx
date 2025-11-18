@@ -1,6 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, Wind, Droplets, ThermometerSun, Users, TrendingUp, RefreshCw } from 'lucide-react';
 
+// Scoring configuration for each activity
+const SCORING_CONFIG = {
+  cycling: {
+    rain: { base: -40, probMultiplier: -20, threshold: 0.2, exponent: 1.5, maxPenalty: 25 },
+    wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
+    crowd: { multiplier: 0.25 },
+    cold: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
+    heat: { threshold: 24, maxPenalty: 30, range: 11, exponent: 1.3 },
+    airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
+    uv: { threshold: 5, maxPenalty: 20, range: 6, exponent: 1.2 },
+    optimalTemp: { min: 15, max: 22, bonus: 5 }
+  },
+  jogging: {
+    rain: { base: -25, probMultiplier: -12, threshold: 0.3, exponent: 1.5, maxPenalty: 18 },
+    wind: { threshold: 5, maxPenalty: 15, range: 8, exponent: 1.2 },
+    crowd: { multiplier: 0.1 },
+    cold: { threshold: 10, maxPenalty: 20, range: 10, exponent: 1.1 },
+    heat: { threshold: 22, maxPenalty: 35, range: 10, exponent: 1.4 },
+    airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
+    uv: { threshold: 4, maxPenalty: 25, range: 7, exponent: 1.3 },
+    optimalTemp: { min: 12, max: 20, bonus: 5 }
+  },
+  kiting: {
+    rain: { base: -30, probMultiplier: -15, threshold: 0.3, exponent: 1.5, maxPenalty: 20 },
+    wind: {
+      veryLowPenalty: -50, veryLowThreshold: 2,
+      lowPenalty: -30, lowThreshold: 4,
+      optimalMin: 4, optimalMax: 7, optimalBonus: 30,
+      goodMin: 7, goodMax: 10, goodBonus: 10,
+      highPenalty: -20, highThreshold: 10, highMax: 12,
+      veryHighPenalty: -50, veryHighThreshold: 12
+    },
+    crowd: { multiplier: 0.35 },
+    cold: { threshold: 8, maxPenalty: 25, range: 8, exponent: 1.3 },
+    heat: { threshold: 30, flatPenalty: -10 },
+    airQuality: { threshold: 2, maxPenalty: 15, range: 3, exponent: 1.3 },
+    uv: { threshold: 5, maxPenalty: 20, range: 6, exponent: 1.2 }
+  },
+  picnic: {
+    rain: { base: -60, probMultiplier: -20, threshold: 0.2, exponent: 1.6, maxPenalty: 35 },
+    wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
+    crowd: { bonus: 10, threshold: 30 },
+    cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
+    heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.2 },
+    airQuality: { threshold: 2, maxPenalty: 20, range: 3, exponent: 1.3 },
+    uv: { threshold: 4, maxPenalty: 30, range: 7, exponent: 1.3 },
+    optimalTemp: { min: 18, max: 24, bonus: 10 }
+  }
+};
+
 export default function TempelhoferBikeForecast() {
   const [forecastData, setForecastData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -132,84 +182,73 @@ export default function TempelhoferBikeForecast() {
     const date = new Date(hourData.dt * 1000);
     const hour = date.getHours();
     const dayOfWeek = date.getDay();
-    
+    const config = SCORING_CONFIG.cycling;
+
     if (!isOpen(hour, date)) return 0;
-    
+
     // Thunderstorm penalty - CRITICAL (exposed area)
     if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
       return 0; // Absolutely not safe
     }
-    
-    // Rain penalty - continuous scale based on probability and actual rain
+
+    // Rain penalty
     const pop = hourData.pop;
     if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      // Base penalty for actual rain
-      score -= 40;
-      // Additional penalty based on rain probability (0-20 points for 0-100% chance)
-      score -= pop * 20;
-    } else {
-      // Penalty for rain chance even without current rain
-      // Gradual increase: 30% = -3, 50% = -7.5, 70% = -14, 90% = -22.5
-      if (pop > 0.2) {
-        score -= Math.pow((pop - 0.2) / 0.8, 1.5) * 25;
-      }
+      score += config.rain.base;
+      score += pop * config.rain.probMultiplier;
+    } else if (pop > config.rain.threshold) {
+      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
     }
-    
-    // Wind penalty - continuous scale
-    // Starts at 3 m/s (light breeze is fine), increases gradually
-    // 3 m/s = 0, 5 m/s = -4, 7 m/s = -11, 10 m/s = -24, 13 m/s = -39 (capped at 40)
+
+    // Wind penalty
     const windSpeed = hourData.wind_speed;
-    if (windSpeed > 3) {
-      const windPenalty = Math.pow((windSpeed - 3) / 7, 1.3) * 40;
-      score -= Math.min(40, windPenalty);
+    if (windSpeed > config.wind.threshold) {
+      const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
+      score -= Math.min(config.wind.maxPenalty, windPenalty);
     }
-    
+
     // Crowd penalty
     const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    score -= (crowdFactor * 0.25);
-    
-    // Temperature penalty - continuous scales for both cold and hot
+    score -= (crowdFactor * config.crowd.multiplier);
+
+    // Temperature penalties
     const temp = hourData.temp;
-    
-    // Cold penalty: gets worse below 10°C
-    // 10°C = 0, 5°C = -8, 0°C = -18, -5°C = -30
-    if (temp < 10) {
-      const coldPenalty = Math.pow((10 - temp) / 10, 1.2) * 30;
-      score -= Math.min(30, coldPenalty);
+
+    // Cold penalty
+    if (temp < config.cold.threshold) {
+      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
+      score -= Math.min(config.cold.maxPenalty, coldPenalty);
     }
-    
-    // Hot penalty: gets worse above 24°C
-    // 24°C = 0, 26°C = -2, 28°C = -6, 30°C = -11, 32°C = -17, 35°C = -26
-    if (temp > 24) {
-      const hotPenalty = Math.pow((temp - 24) / 11, 1.3) * 30;
-      score -= Math.min(30, hotPenalty);
+
+    // Heat penalty
+    if (temp > config.heat.threshold) {
+      const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
+      score -= Math.min(config.heat.maxPenalty, hotPenalty);
     }
-    
-    // Air Quality penalty - continuous scale
-    // AQI: 1=Good (0), 2=Fair (-5), 3=Moderate (-12), 4=Poor (-22), 5=Very Poor (-35)
+
+    // Air Quality penalty
     if (hourData.air_quality && hourData.air_quality.aqi) {
       const aqi = hourData.air_quality.aqi;
-      if (aqi > 1) {
-        const aqiPenalty = Math.pow((aqi - 1) / 4, 1.4) * 35;
+      if (aqi > config.airQuality.threshold) {
+        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
         score -= aqiPenalty;
       }
     }
-    
-    // UV Index penalty - continuous scale
-    // UV: 0-5 = fine (0), 6-7 = high (-5 to -10), 8-10 = very high (-10 to -20), 11+ = extreme (-20)
+
+    // UV Index penalty
     if (hourData.uvi !== undefined) {
       const uvi = hourData.uvi;
-      if (uvi > 5) {
-        const uvPenalty = Math.pow((uvi - 5) / 6, 1.2) * 20;
-        score -= Math.min(20, uvPenalty);
+      if (uvi > config.uv.threshold) {
+        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
+        score -= Math.min(config.uv.maxPenalty, uvPenalty);
       }
     }
-    
-    // Optimal temperature bonus (15-22°C)
-    if (temp >= 15 && temp <= 22) {
-      score += 5;
+
+    // Optimal temperature bonus
+    if (temp >= config.optimalTemp.min && temp <= config.optimalTemp.max) {
+      score += config.optimalTemp.bonus;
     }
-    
+
     return Math.max(0, Math.min(100, Math.round(score)));
   };
 
@@ -218,77 +257,73 @@ export default function TempelhoferBikeForecast() {
     const date = new Date(hourData.dt * 1000);
     const hour = date.getHours();
     const dayOfWeek = date.getDay();
-    
+    const config = SCORING_CONFIG.jogging;
+
     if (!isOpen(hour, date)) return 0;
-    
+
     // Thunderstorm penalty - CRITICAL (exposed area)
     if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
       return 0; // Absolutely not safe
     }
-    
-    // Rain penalty - slightly increased (still less than cycling)
+
+    // Rain penalty
     const pop = hourData.pop;
     if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score -= 25;
-      score -= pop * 12;
-    } else {
-      if (pop > 0.3) {
-        score -= Math.pow((pop - 0.3) / 0.7, 1.5) * 18;
-      }
+      score += config.rain.base;
+      score += pop * config.rain.probMultiplier;
+    } else if (pop > config.rain.threshold) {
+      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
     }
-    
-    // Wind penalty - much less affected while jogging
-    // Jogging is slower and lower profile than cycling
+
+    // Wind penalty
     const windSpeed = hourData.wind_speed;
-    if (windSpeed > 5) {
-      const windPenalty = Math.pow((windSpeed - 5) / 8, 1.2) * 15;
-      score -= Math.min(15, windPenalty);
+    if (windSpeed > config.wind.threshold) {
+      const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
+      score -= Math.min(config.wind.maxPenalty, windPenalty);
     }
-    
-    // Crowd penalty - less of an issue for joggers
+
+    // Crowd penalty
     const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    score -= (crowdFactor * 0.1); // Much less penalty than cycling
-    
-    // Temperature penalty - HEAT IS WORSE for jogging!
+    score -= (crowdFactor * config.crowd.multiplier);
+
+    // Temperature penalties
     const temp = hourData.temp;
-    
-    // Cold penalty: less severe (you warm up while running)
-    // 10°C = 0, 5°C = -5, 0°C = -12, -5°C = -20
-    if (temp < 10) {
-      const coldPenalty = Math.pow((10 - temp) / 10, 1.1) * 20;
-      score -= Math.min(20, coldPenalty);
+
+    // Cold penalty
+    if (temp < config.cold.threshold) {
+      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
+      score -= Math.min(config.cold.maxPenalty, coldPenalty);
     }
-    
-    // Hot penalty: MORE severe for jogging (overheating risk)
-    // 22°C = 0, 25°C = -8, 28°C = -18, 30°C = -27, 32°C = -35
-    if (temp > 22) {
-      const hotPenalty = Math.pow((temp - 22) / 10, 1.4) * 35;
-      score -= Math.min(35, hotPenalty);
+
+    // Heat penalty
+    if (temp > config.heat.threshold) {
+      const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
+      score -= Math.min(config.heat.maxPenalty, hotPenalty);
     }
-    
-    // Air Quality penalty - same as cycling (breathing hard)
+
+    // Air Quality penalty
     if (hourData.air_quality && hourData.air_quality.aqi) {
       const aqi = hourData.air_quality.aqi;
-      if (aqi > 1) {
-        const aqiPenalty = Math.pow((aqi - 1) / 4, 1.4) * 35;
+      if (aqi > config.airQuality.threshold) {
+        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
         score -= aqiPenalty;
       }
     }
-    
-    // UV Index penalty - MORE severe for jogging (more exposed, slower, longer duration)
+
+    // UV Index penalty
     if (hourData.uvi !== undefined) {
       const uvi = hourData.uvi;
-      if (uvi > 4) {
-        const uvPenalty = Math.pow((uvi - 4) / 7, 1.3) * 25;
-        score -= Math.min(25, uvPenalty);
+      if (uvi > config.uv.threshold) {
+        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
+        score -= Math.min(config.uv.maxPenalty, uvPenalty);
       }
     }
-    
-    // Optimal temperature bonus (12-20°C - cooler is better for running)
-    if (temp >= 12 && temp <= 20) {
-      score += 5;
+
+    // Optimal temperature bonus
+    if (temp >= config.optimalTemp.min && temp <= config.optimalTemp.max) {
+      score += config.optimalTemp.bonus;
     }
-    
+
     return Math.max(0, Math.min(100, Math.round(score)));
   };
 
@@ -297,69 +332,74 @@ export default function TempelhoferBikeForecast() {
     const date = new Date(hourData.dt * 1000);
     const hour = date.getHours();
     const dayOfWeek = date.getDay();
-    
+    const config = SCORING_CONFIG.kiting;
+
     if (!isOpen(hour, date)) return 0;
-    
+
     // Thunderstorm penalty - EXTREMELY CRITICAL for kiting (metal frame + lightning)
     if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
       return 0; // Deadly combination
     }
-    
+
     // Wind - INVERTED SCORING! Need wind for kiting
     const windSpeed = hourData.wind_speed;
-    if (windSpeed < 2) {
-      score -= 50; // No kiting without wind
-    } else if (windSpeed < 4) {
-      score -= 30; // Too light
-    } else if (windSpeed >= 4 && windSpeed <= 7) {
-      score += 30; // PERFECT! Optimal kiting wind
-    } else if (windSpeed > 7 && windSpeed <= 10) {
-      score += 10; // Good but getting strong
-    } else if (windSpeed > 10 && windSpeed <= 12) {
-      score -= 20; // Too strong, dangerous
-    } else if (windSpeed > 12) {
-      score -= 50; // Way too dangerous
+    const w = config.wind;
+    if (windSpeed < w.veryLowThreshold) {
+      score += w.veryLowPenalty;
+    } else if (windSpeed < w.lowThreshold) {
+      score += w.lowPenalty;
+    } else if (windSpeed >= w.optimalMin && windSpeed <= w.optimalMax) {
+      score += w.optimalBonus;
+    } else if (windSpeed > w.goodMin && windSpeed <= w.goodMax) {
+      score += w.goodBonus;
+    } else if (windSpeed > w.highThreshold && windSpeed <= w.highMax) {
+      score += w.highPenalty;
+    } else if (windSpeed > w.veryHighThreshold) {
+      score += w.veryHighPenalty;
     }
-    
-    // Rain penalty - more severe (wet equipment, visibility issues)
+
+    // Rain penalty
     const pop = hourData.pop;
     if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score -= 30;
-      score -= pop * 15;
-    } else if (pop > 0.3) {
-      score -= Math.pow((pop - 0.3) / 0.7, 1.5) * 20;
+      score += config.rain.base;
+      score += pop * config.rain.probMultiplier;
+    } else if (pop > config.rain.threshold) {
+      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
     }
-    
-    // Crowd penalty - VERY IMPORTANT for safety
+
+    // Crowd penalty
     const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    score -= (crowdFactor * 0.35); // Higher than cycling
-    
-    // Temperature - less critical for kiting
+    score -= (crowdFactor * config.crowd.multiplier);
+
+    // Temperature penalties
     const temp = hourData.temp;
-    if (temp < 5) {
-      score -= 15; // Cold hands
-    } else if (temp > 30) {
-      score -= 10; // Hot but manageable
+
+    // Cold penalty
+    if (temp < config.cold.threshold) {
+      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
+      score -= Math.min(config.cold.maxPenalty, coldPenalty);
+    } else if (temp > config.heat.threshold) {
+      score += config.heat.flatPenalty;
     }
-    
-    // Air Quality - less relevant
+
+    // Air Quality penalty
     if (hourData.air_quality && hourData.air_quality.aqi) {
       const aqi = hourData.air_quality.aqi;
-      if (aqi > 2) {
-        const aqiPenalty = Math.pow((aqi - 2) / 3, 1.3) * 15;
+      if (aqi > config.airQuality.threshold) {
+        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
         score -= aqiPenalty;
       }
     }
-    
-    // UV - important (standing outside for hours)
+
+    // UV Index penalty
     if (hourData.uvi !== undefined) {
       const uvi = hourData.uvi;
-      if (uvi > 5) {
-        const uvPenalty = Math.pow((uvi - 5) / 6, 1.2) * 20;
-        score -= Math.min(20, uvPenalty);
+      if (uvi > config.uv.threshold) {
+        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
+        score -= Math.min(config.uv.maxPenalty, uvPenalty);
       }
     }
-    
+
     return Math.max(0, Math.min(100, Math.round(score)));
   };
 
@@ -368,72 +408,75 @@ export default function TempelhoferBikeForecast() {
     const date = new Date(hourData.dt * 1000);
     const hour = date.getHours();
     const dayOfWeek = date.getDay();
-    
+    const config = SCORING_CONFIG.picnic;
+
     if (!isOpen(hour, date)) return 0;
-    
+
     // Thunderstorm penalty - ruins everything
     if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
       return 0; // Pack up and go home
     }
-    
-    // Rain penalty - WORST for picnic (ruins food, blankets, etc)
+
+    // Rain penalty - WORST for picnic
     const pop = hourData.pop;
     if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score -= 60; // Deal breaker
-      score -= pop * 20;
-    } else {
-      if (pop > 0.2) {
-        score -= Math.pow((pop - 0.2) / 0.8, 1.6) * 35;
-      }
+      score += config.rain.base;
+      score += pop * config.rain.probMultiplier;
+    } else if (pop > config.rain.threshold) {
+      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
     }
-    
-    // Wind penalty - same as cycling (gets annoying at THF)
+
+    // Wind penalty
     const windSpeed = hourData.wind_speed;
-    if (windSpeed > 3) {
-      const windPenalty = Math.pow((windSpeed - 3) / 7, 1.3) * 40;
-      score -= Math.min(40, windPenalty);
+    if (windSpeed > config.wind.threshold) {
+      const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
+      score -= Math.min(config.wind.maxPenalty, windPenalty);
     }
-    
+
     // Crowds - POSITIVE! Good atmosphere for socializing
     const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    if (crowdFactor > 30) {
-      score += 10; // Nice atmosphere
+    if (crowdFactor > config.crowd.threshold) {
+      score += config.crowd.bonus;
     }
-    
-    // Temperature - wider comfort range for sitting
+
+    // Temperature penalties
     const temp = hourData.temp;
-    if (temp < 12) {
-      const coldPenalty = Math.pow((12 - temp) / 12, 1.3) * 25;
-      score -= Math.min(25, coldPenalty);
+
+    // Cold penalty
+    if (temp < config.cold.threshold) {
+      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
+      score -= Math.min(config.cold.maxPenalty, coldPenalty);
     }
-    if (temp > 28) {
-      const hotPenalty = Math.pow((temp - 28) / 10, 1.2) * 20;
-      score -= Math.min(20, hotPenalty);
+
+    // Heat penalty
+    if (temp > config.heat.threshold) {
+      const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
+      score -= Math.min(config.heat.maxPenalty, hotPenalty);
     }
-    
-    // Optimal temperature bonus (18-24°C)
-    if (temp >= 18 && temp <= 24) {
-      score += 10; // Perfect picnic weather
+
+    // Optimal temperature bonus
+    if (temp >= config.optimalTemp.min && temp <= config.optimalTemp.max) {
+      score += config.optimalTemp.bonus;
     }
-    
-    // Air Quality - moderate concern
+
+    // Air Quality penalty
     if (hourData.air_quality && hourData.air_quality.aqi) {
       const aqi = hourData.air_quality.aqi;
-      if (aqi > 2) {
-        const aqiPenalty = Math.pow((aqi - 2) / 3, 1.3) * 20;
+      if (aqi > config.airQuality.threshold) {
+        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
         score -= aqiPenalty;
       }
     }
-    
-    // UV - IMPORTANT (sitting in sun for hours)
+
+    // UV Index penalty
     if (hourData.uvi !== undefined) {
       const uvi = hourData.uvi;
-      if (uvi > 4) {
-        const uvPenalty = Math.pow((uvi - 4) / 7, 1.3) * 30;
-        score -= Math.min(30, uvPenalty);
+      if (uvi > config.uv.threshold) {
+        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
+        score -= Math.min(config.uv.maxPenalty, uvPenalty);
       }
     }
-    
+
     return Math.max(0, Math.min(100, Math.round(score)));
   };
 
@@ -867,7 +910,7 @@ export default function TempelhoferBikeForecast() {
                         </div>
                       </div>
                       
-                      <div className="space-y-0.5 text-xs">
+                      <div className="space-y-0.5 text-xs min-h-[64px] flex flex-col justify-center">
                         <div className="flex items-center justify-center gap-1">
                           <ThermometerSun className="w-3 h-3" />
                           <span>{Math.round(hour.temp)}°C</span>
@@ -880,12 +923,10 @@ export default function TempelhoferBikeForecast() {
                           <Droplets className="w-3 h-3" />
                           <span>{Math.round(hour.pop * 100)}%</span>
                         </div>
-                        {hour.air_quality && (
-                          <div className="flex items-center justify-center gap-1">
-                            <Cloud className="w-3 h-3" />
-                            <span>AQI {hour.air_quality.aqi}</span>
-                          </div>
-                        )}
+                        <div className="flex items-center justify-center gap-1">
+                          <Cloud className="w-3 h-3" />
+                          <span>{hour.air_quality ? `AQI ${hour.air_quality.aqi}` : 'AQI N/A'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
