@@ -69,9 +69,10 @@ export default function TempelhoferBikeForecast() {
       const time = new Date(startOfToday.getTime() + i * 60 * 60 * 1000);
       const hour = time.getHours();
       
-      // Create realistic weather patterns
-      const baseTemp = 15 + Math.sin((i / 24) * Math.PI) * 5;
-      const seasonalVariation = Math.sin((i / 168) * Math.PI) * 3;
+      // Create realistic weather patterns (adjusted for current season)
+      // November in Berlin: typically 2-8°C
+      const baseTemp = 5 + Math.sin((i / 24) * Math.PI) * 3;
+      const seasonalVariation = Math.sin((i / 168) * Math.PI) * 2;
       const temp = baseTemp + seasonalVariation + (Math.random() - 0.5) * 2;
       
       // Wind patterns
@@ -895,7 +896,7 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-sm text-gray-500 mb-2">#{idx + 1}</div>
                     <div
                       onClick={() => setSelectedHour(hour)}
-                      className="border-2 rounded-lg p-1.5 transition-all hover:scale-105 cursor-pointer"
+                      className="border-2 rounded-lg p-1.5 transition-all hover:scale-105 cursor-pointer w-24"
                       style={colors}
                     >
                       <div className="flex flex-col items-center mb-0.5">
@@ -1054,8 +1055,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Based on time, day, and weather</div>
                   </li>
                   <li>
-                    <strong>Cold:</strong> Gradual below 10°C
-                    <div className="text-xs mt-1 ml-4">5°C = -8, 0°C = -18, -5°C = -30</div>
+                    <strong>Cold:</strong> Gradual below 12°C (max -40)
+                    <div className="text-xs mt-1 ml-4">8°C = -8, 5°C = -16, 0°C = -28, -5°C = -40</div>
                   </li>
                   <li>
                     <strong>Heat:</strong> Gradual above 24°C
@@ -1077,7 +1078,7 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Not safe in exposed area</div>
                   </li>
                   <li>
-                    <strong>Rain:</strong> -20 base + up to -10 for probability
+                    <strong>Rain:</strong> -25 base + up to -12 for probability
                     <div className="text-xs mt-1 ml-4">Many runners don't mind light rain</div>
                   </li>
                   <li>
@@ -1112,15 +1113,15 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">&lt;2 m/s = -50, &gt;12 m/s = -50 (too dangerous)</div>
                   </li>
                   <li>
-                    <strong>Rain:</strong> -15 base + probability penalty
-                    <div className="text-xs mt-1 ml-4">Annoying but manageable</div>
+                    <strong>Rain:</strong> -30 base + up to -15 for probability
+                    <div className="text-xs mt-1 ml-4">Wet equipment, visibility issues</div>
                   </li>
                   <li>
                     <strong>Crowds:</strong> Up to -35 points
                     <div className="text-xs mt-1 ml-4">SAFETY: Need space for kite</div>
                   </li>
                   <li>
-                    <strong>Cold:</strong> Below 5°C: -15
+                    <strong>Cold:</strong> Gradual below 8°C (max -25)
                     <div className="text-xs mt-1 ml-4">Cold hands affect control</div>
                   </li>
                   <li>
@@ -1139,7 +1140,7 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Ruins food, blankets, everything</div>
                   </li>
                   <li>
-                    <strong>Wind:</strong> Gradual above 4 m/s (max -25)
+                    <strong>Wind:</strong> Gradual above 3 m/s (max -40)
                     <div className="text-xs mt-1 ml-4">Flies blankets, ruins setup</div>
                   </li>
                   <li>
@@ -1147,8 +1148,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Good atmosphere for socializing</div>
                   </li>
                   <li>
-                    <strong>Cold:</strong> Gradual below 12°C (max -25)
-                    <div className="text-xs mt-1 ml-4">Uncomfortable sitting still</div>
+                    <strong>Cold:</strong> Gradual below 15°C (max -35)
+                    <div className="text-xs mt-1 ml-4">12°C = -8, 8°C = -20, 5°C = -28, 0°C = -35</div>
                   </li>
                   <li>
                     <strong>Heat:</strong> Gradual above 28°C (max -20)
