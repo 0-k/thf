@@ -10,8 +10,7 @@ const SCORING_CONFIG = {
     cold: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
     heat: { threshold: 24, maxPenalty: 30, range: 11, exponent: 1.3 },
     airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 5, maxPenalty: 20, range: 6, exponent: 1.2 },
-    optimalTemp: { min: 15, max: 22, bonus: 5 }
+    uv: { threshold: 5, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
   jogging: {
     rain: { base: -25, probMultiplier: -12, threshold: 0.3, exponent: 1.5, maxPenalty: 18 },
@@ -20,15 +19,14 @@ const SCORING_CONFIG = {
     cold: { threshold: 10, maxPenalty: 20, range: 10, exponent: 1.1 },
     heat: { threshold: 22, maxPenalty: 35, range: 10, exponent: 1.4 },
     airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 4, maxPenalty: 25, range: 7, exponent: 1.3 },
-    optimalTemp: { min: 12, max: 20, bonus: 5 }
+    uv: { threshold: 4, maxPenalty: 25, range: 7, exponent: 1.3 }
   },
   kiting: {
     rain: { base: -30, probMultiplier: -15, threshold: 0.3, exponent: 1.5, maxPenalty: 20 },
     wind: {
       tooLightPenalty: -50, tooLightThreshold: 5,      // < 5 m/s: Too light
-      optimalMin: 7, optimalMax: 9, optimalBonus: 25,   // 7-9 m/s: Sweet spot
-      goodMin: 5, goodMax: 11, goodBonus: 15,           // 5-11 m/s: Workable range
+      optimalMin: 7, optimalMax: 9,                     // 7-9 m/s: Sweet spot (no penalty)
+      workableMin: 5, workableMax: 11,                  // 5-11 m/s: Workable range (no penalty)
       dangerousMin: 11, dangerousMax: 13, dangerousPenalty: -25,  // 11-13 m/s: Getting dangerous
       veryDangerousPenalty: -50, veryDangerousThreshold: 13      // > 13 m/s: Very dangerous
     },
@@ -41,12 +39,11 @@ const SCORING_CONFIG = {
   picnic: {
     rain: { base: -60, probMultiplier: -20, threshold: 0.2, exponent: 1.6, maxPenalty: 35 },
     wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
-    crowd: { bonus: 10, threshold: 30 },
+    crowd: { multiplier: 0.25 },  // Changed from bonus to penalty
     cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
     heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.2 },
     airQuality: { threshold: 2, maxPenalty: 20, range: 3, exponent: 1.3 },
-    uv: { threshold: 4, maxPenalty: 30, range: 7, exponent: 1.3 },
-    optimalTemp: { min: 18, max: 24, bonus: 10 }
+    uv: { threshold: 4, maxPenalty: 30, range: 7, exponent: 1.3 }
   }
 };
 
@@ -244,11 +241,6 @@ export default function TempelhoferBikeForecast() {
       }
     }
 
-    // Optimal temperature bonus
-    if (temp >= config.optimalTemp.min && temp <= config.optimalTemp.max) {
-      score += config.optimalTemp.bonus;
-    }
-
     return Math.max(0, Math.min(100, Math.round(score)));
   };
 
@@ -319,11 +311,6 @@ export default function TempelhoferBikeForecast() {
       }
     }
 
-    // Optimal temperature bonus
-    if (temp >= config.optimalTemp.min && temp <= config.optimalTemp.max) {
-      score += config.optimalTemp.bonus;
-    }
-
     return Math.max(0, Math.min(100, Math.round(score)));
   };
 
@@ -341,18 +328,15 @@ export default function TempelhoferBikeForecast() {
       return 0; // Deadly combination
     }
 
-    // Wind - INVERTED SCORING! Need wind for kiting
+    // Wind - CRITICAL for kiting! Need wind but not too much
     const windSpeed = hourData.wind_speed;
     const w = config.wind;
     if (windSpeed < w.tooLightThreshold) {
       // < 5 m/s: Too light, insufficient power
       score += w.tooLightPenalty;
-    } else if (windSpeed >= w.optimalMin && windSpeed <= w.optimalMax) {
-      // 7-9 m/s: Sweet spot
-      score += w.optimalBonus;
-    } else if (windSpeed >= w.goodMin && windSpeed <= w.goodMax) {
-      // 5-11 m/s: Workable range (but not optimal)
-      score += w.goodBonus;
+    } else if (windSpeed >= w.workableMin && windSpeed <= w.workableMax) {
+      // 5-11 m/s: Workable range (no penalty, this is good!)
+      // No adjustment needed - this is the ideal range
     } else if (windSpeed > w.dangerousMin && windSpeed <= w.dangerousMax) {
       // 11-13 m/s: Getting dangerous
       score += w.dangerousPenalty;
@@ -436,11 +420,9 @@ export default function TempelhoferBikeForecast() {
       score -= Math.min(config.wind.maxPenalty, windPenalty);
     }
 
-    // Crowds - POSITIVE! Good atmosphere for socializing
+    // Crowd penalty (mild for picnic - crowds less of an issue)
     const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    if (crowdFactor > config.crowd.threshold) {
-      score += config.crowd.bonus;
-    }
+    score -= (crowdFactor * config.crowd.multiplier);
 
     // Temperature penalties
     const temp = hourData.temp;
@@ -455,11 +437,6 @@ export default function TempelhoferBikeForecast() {
     if (temp > config.heat.threshold) {
       const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
       score -= Math.min(config.heat.maxPenalty, hotPenalty);
-    }
-
-    // Optimal temperature bonus
-    if (temp >= config.optimalTemp.min && temp <= config.optimalTemp.max) {
-      score += config.optimalTemp.bonus;
     }
 
     // Air Quality penalty
@@ -1111,8 +1088,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Metal frame + lightning = extreme danger</div>
                   </li>
                   <li>
-                    <strong>Wind:</strong> NEEDS WIND! 7-9 m/s = +25 (sweet spot)
-                    <div className="text-xs mt-1 ml-4">&lt;5 m/s = -50 (too light), 5-11 m/s = +15 (workable), &gt;13 m/s = -50 (dangerous)</div>
+                    <strong>Wind:</strong> NEEDS WIND! 5-11 m/s ideal range
+                    <div className="text-xs mt-1 ml-4">&lt;5 m/s = -50 (too light), 5-11 m/s = no penalty, 11-13 m/s = -25, &gt;13 m/s = -50 (dangerous)</div>
                   </li>
                   <li>
                     <strong>Rain:</strong> -30 base + up to -15 for probability
@@ -1146,8 +1123,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Flies blankets, ruins setup</div>
                   </li>
                   <li>
-                    <strong>Crowds:</strong> +10 points (POSITIVE!)
-                    <div className="text-xs mt-1 ml-4">Good atmosphere for socializing</div>
+                    <strong>Crowds:</strong> Up to -25 points
+                    <div className="text-xs mt-1 ml-4">Mild penalty (less of an issue than for cycling)</div>
                   </li>
                   <li>
                     <strong>Cold:</strong> Gradual below 15°C (max -35)
@@ -1166,12 +1143,9 @@ export default function TempelhoferBikeForecast() {
             </div>
             <div>
               <div className="p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-semibold text-blue-900 mb-2">Bonus Conditions</h4>
+                <h4 className="font-semibold text-blue-900 mb-2">Scoring System</h4>
                 <p className="text-sm text-blue-800">
-                  {activity === 'cycling' && <><strong>Sweet spot:</strong> 15-22°C temps get a +5 bonus</>}
-                  {activity === 'jogging' && <><strong>Sweet spot:</strong> 12-20°C temps get a +5 bonus</>}
-                  {activity === 'kiting' && <><strong>Wind is key:</strong> 4-7 m/s gives +30 bonus</>}
-                  {activity === 'picnic' && <><strong>Sweet spot:</strong> 18-24°C temps get a +10 bonus</>}
+                  All activities start at <strong>100 points</strong>. Only penalties apply - no bonuses. The score reflects how many conditions are working against your activity.
                 </p>
               </div>
             </div>
