@@ -845,7 +845,7 @@ export default function TempelhoferBikeForecast() {
           {usingMockData && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                <strong>Mock Data:</strong> Using simulated weather data. Add an OpenWeatherMap API key to see real forecasts.
+                <strong>Mock Data:</strong> Using simulated weather data. Deploy to see real forecasts from Open-Meteo.
               </p>
             </div>
           )}
@@ -853,7 +853,7 @@ export default function TempelhoferBikeForecast() {
           {!usingMockData && (
             <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-800">
-                <strong>Live Data:</strong> Showing real weather forecast from OpenWeatherMap.
+                <strong>Live Data:</strong> Real weather forecast from Open-Meteo (DWD ICON model, free).
               </p>
             </div>
           )}

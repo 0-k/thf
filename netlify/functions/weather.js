@@ -1,12 +1,11 @@
 /**
  * Netlify Function: Weather API
- * Fetches weather data from OpenWeatherMap and caches it for 1 hour
+ * Fetches weather data from Open-Meteo (free, no API key needed)
  */
 
 const fetch = require('node-fetch');
 
 // In-memory cache (simple solution for serverless)
-// Note: Each function instance has its own cache, but that's OK for our use case
 let cache = {
   data: null,
   timestamp: null
@@ -15,6 +14,35 @@ let cache = {
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const TEMPELHOFER_LAT = 52.4732;
 const TEMPELHOFER_LON = 13.4053;
+
+// WMO Weather interpretation codes
+const WMO_WEATHER_CODES = {
+  0: { main: 'Clear', description: 'clear sky' },
+  1: { main: 'Clear', description: 'mainly clear' },
+  2: { main: 'Clouds', description: 'partly cloudy' },
+  3: { main: 'Clouds', description: 'overcast' },
+  45: { main: 'Fog', description: 'fog' },
+  48: { main: 'Fog', description: 'depositing rime fog' },
+  51: { main: 'Drizzle', description: 'light drizzle' },
+  53: { main: 'Drizzle', description: 'moderate drizzle' },
+  55: { main: 'Drizzle', description: 'dense drizzle' },
+  61: { main: 'Rain', description: 'slight rain' },
+  63: { main: 'Rain', description: 'moderate rain' },
+  65: { main: 'Rain', description: 'heavy rain' },
+  71: { main: 'Snow', description: 'slight snow' },
+  73: { main: 'Snow', description: 'moderate snow' },
+  75: { main: 'Snow', description: 'heavy snow' },
+  80: { main: 'Rain', description: 'slight rain showers' },
+  81: { main: 'Rain', description: 'moderate rain showers' },
+  82: { main: 'Rain', description: 'violent rain showers' },
+  95: { main: 'Thunderstorm', description: 'thunderstorm' },
+  96: { main: 'Thunderstorm', description: 'thunderstorm with slight hail' },
+  99: { main: 'Thunderstorm', description: 'thunderstorm with heavy hail' }
+};
+
+function mapWeatherCode(code) {
+  return WMO_WEATHER_CODES[code] || { main: 'Unknown', description: 'unknown' };
+}
 
 exports.handler = async function(event, context) {
   // CORS headers
@@ -60,119 +88,147 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Fetch fresh data from OpenWeatherMap
-    const apiKey = process.env.OPENWEATHER_API_KEY;
+    // Build Open-Meteo API URL for forecast
+    const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast');
+    forecastUrl.searchParams.set('latitude', TEMPELHOFER_LAT);
+    forecastUrl.searchParams.set('longitude', TEMPELHOFER_LON);
+    forecastUrl.searchParams.set('hourly', [
+      'temperature_2m',
+      'apparent_temperature',
+      'precipitation_probability',
+      'precipitation',
+      'weather_code',
+      'cloud_cover',
+      'visibility',
+      'wind_speed_10m',
+      'wind_direction_10m',
+      'wind_gusts_10m',
+      'uv_index',
+      'is_day'
+    ].join(','));
+    forecastUrl.searchParams.set('timezone', 'Europe/Berlin');
+    forecastUrl.searchParams.set('forecast_days', '7');
 
-    if (!apiKey) {
-      console.error('OPENWEATHER_API_KEY not set');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'API key not configured'
-        })
-      };
-    }
+    // Fetch past 24 hours for today's historical data
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
-    // Using basic free APIs - no subscription needed, works immediately
-    // Fetch current weather + 5-day/3-hour forecast
-    const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${TEMPELHOFER_LAT}&lon=${TEMPELHOFER_LON}&units=metric&appid=${apiKey}`;
-    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${TEMPELHOFER_LAT}&lon=${TEMPELHOFER_LON}&units=metric&appid=${apiKey}`;
+    const historicalUrl = new URL('https://api.open-meteo.com/v1/forecast');
+    historicalUrl.searchParams.set('latitude', TEMPELHOFER_LAT);
+    historicalUrl.searchParams.set('longitude', TEMPELHOFER_LON);
+    historicalUrl.searchParams.set('hourly', [
+      'temperature_2m',
+      'apparent_temperature',
+      'precipitation_probability',
+      'precipitation',
+      'weather_code',
+      'cloud_cover',
+      'visibility',
+      'wind_speed_10m',
+      'wind_direction_10m',
+      'wind_gusts_10m',
+      'uv_index',
+      'is_day'
+    ].join(','));
+    historicalUrl.searchParams.set('timezone', 'Europe/Berlin');
+    historicalUrl.searchParams.set('past_days', '1');
+    historicalUrl.searchParams.set('forecast_days', '1');
 
-    console.log('Fetching weather data from basic free API...');
+    console.log('Fetching weather data from Open-Meteo...');
 
-    const [currentResponse, forecastResponse] = await Promise.all([
-      fetch(currentUrl),
-      fetch(forecastUrl)
+    const [forecastResponse, historicalResponse] = await Promise.all([
+      fetch(forecastUrl.toString()),
+      fetch(historicalUrl.toString())
     ]);
-
-    if (!currentResponse.ok) {
-      console.error('Current weather API error:', currentResponse.status);
-      const errorText = await currentResponse.text();
-      console.error('Error details:', errorText);
-      return {
-        statusCode: currentResponse.status,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: `Current weather API returned ${currentResponse.status}`,
-          details: errorText
-        })
-      };
-    }
 
     if (!forecastResponse.ok) {
       console.error('Forecast API error:', forecastResponse.status);
+      const errorText = await forecastResponse.text();
+      console.error('Error details:', errorText);
       return {
         statusCode: forecastResponse.status,
         headers,
         body: JSON.stringify({
           success: false,
-          error: `Forecast API returned ${forecastResponse.status}`
+          error: `Forecast API returned ${forecastResponse.status}`,
+          details: errorText
         })
       };
     }
 
-    const currentData = await currentResponse.json();
+    if (!historicalResponse.ok) {
+      console.error('Historical API error:', historicalResponse.status);
+      // Non-fatal, we can continue without past hours
+    }
+
     const forecastData = await forecastResponse.json();
+    const historicalData = historicalResponse.ok ? await historicalResponse.json() : null;
 
-    // Convert to One Call API format for compatibility
-    // Forecast API gives 3-hour intervals for 5 days (40 data points)
-    const hourly = forecastData.list.map(item => ({
-      dt: item.dt,
-      temp: item.main.temp,
-      feels_like: item.main.feels_like,
-      pressure: item.main.pressure,
-      humidity: item.main.humidity,
-      dew_point: item.main.temp - ((100 - item.main.humidity) / 5), // approximation
-      uvi: 0, // Not available in free API
-      clouds: item.clouds.all,
-      visibility: item.visibility || 10000,
-      wind_speed: item.wind.speed,
-      wind_deg: item.wind.deg,
-      wind_gust: item.wind.gust || item.wind.speed,
-      weather: item.weather,
-      pop: item.pop || 0,
-      rain: item.rain ? { '3h': item.rain['3h'] || 0 } : undefined,
-      snow: item.snow ? { '3h': item.snow['3h'] || 0 } : undefined,
-      air_quality: { aqi: 2 } // Mock AQI since not available
-    }));
+    // Convert Open-Meteo hourly data to our format
+    const convertHourlyData = (data, startIndex = 0) => {
+      const hourly = [];
+      const times = data.hourly.time;
 
-    // Backfill past hours of today (from midnight to current hour)
-    // Free API doesn't provide historical data, so we interpolate from current conditions
-    const nowTimestamp = currentData.dt;
-    const nowDate = new Date(nowTimestamp * 1000);
+      for (let i = startIndex; i < times.length; i++) {
+        const time = new Date(times[i]);
+        const weatherInfo = mapWeatherCode(data.hourly.weather_code[i]);
+
+        hourly.push({
+          dt: Math.floor(time.getTime() / 1000),
+          temp: data.hourly.temperature_2m[i],
+          feels_like: data.hourly.apparent_temperature[i],
+          pressure: 1013, // Not available in free tier, using standard pressure
+          humidity: 50, // Not available in free tier, using typical value
+          dew_point: data.hourly.temperature_2m[i] - 5, // Approximation
+          uvi: data.hourly.uv_index[i] || 0,
+          clouds: data.hourly.cloud_cover[i],
+          visibility: data.hourly.visibility[i] || 10000,
+          wind_speed: data.hourly.wind_speed_10m[i],
+          wind_deg: data.hourly.wind_direction_10m[i],
+          wind_gust: data.hourly.wind_gusts_10m[i] || data.hourly.wind_speed_10m[i],
+          weather: [weatherInfo],
+          pop: (data.hourly.precipitation_probability[i] || 0) / 100,
+          rain: data.hourly.precipitation[i] > 0 ? { '1h': data.hourly.precipitation[i] } : undefined,
+          air_quality: { aqi: 2 }, // Not available in Open-Meteo, using mock value
+          hasThunderstorm: data.hourly.weather_code[i] >= 95
+        });
+      }
+
+      return hourly;
+    };
+
+    // Get midnight of today
+    const nowDate = new Date();
     const midnightToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), 0, 0, 0);
     const midnightTimestamp = Math.floor(midnightToday.getTime() / 1000);
 
-    const pastHours = [];
-    for (let ts = midnightTimestamp; ts < nowTimestamp; ts += 3600) {
-      // Interpolate temperature (slightly cooler in early morning)
-      const hour = new Date(ts * 1000).getHours();
-      const tempVariation = hour < 6 ? -2 : (hour < 12 ? -1 : 0);
+    // Combine historical (past hours of today) + forecast
+    let allHourly = [];
 
-      pastHours.push({
-        dt: ts,
-        temp: currentData.main.temp + tempVariation,
-        feels_like: currentData.main.feels_like + tempVariation,
-        pressure: currentData.main.pressure,
-        humidity: currentData.main.humidity,
-        dew_point: currentData.main.temp - ((100 - currentData.main.humidity) / 5),
-        uvi: 0,
-        clouds: currentData.clouds.all,
-        visibility: currentData.visibility || 10000,
-        wind_speed: currentData.wind.speed * (hour < 6 ? 0.7 : 0.9),
-        wind_deg: currentData.wind.deg,
-        wind_gust: currentData.wind.gust || currentData.wind.speed,
-        weather: currentData.weather,
-        pop: 0,
-        air_quality: { aqi: 2 }
+    if (historicalData) {
+      // Get only past hours of today from historical data
+      const historicalHourly = convertHourlyData(historicalData);
+      const pastHoursToday = historicalHourly.filter(h => {
+        return h.dt >= midnightTimestamp && h.dt < Math.floor(nowDate.getTime() / 1000);
       });
+      allHourly = pastHoursToday;
     }
 
-    // Combine past hours + current + future forecast
-    const allHourly = [...pastHours, ...hourly];
+    // Add forecast data (includes current hour onwards)
+    const forecastHourly = convertHourlyData(forecastData);
+    allHourly = [...allHourly, ...forecastHourly];
+
+    // Remove duplicates (in case of overlap)
+    const seen = new Set();
+    allHourly = allHourly.filter(h => {
+      if (seen.has(h.dt)) return false;
+      seen.add(h.dt);
+      return true;
+    });
+
+    // Sort by timestamp
+    allHourly.sort((a, b) => a.dt - b.dt);
 
     const weatherData = {
       lat: TEMPELHOFER_LAT,
@@ -180,9 +236,9 @@ exports.handler = async function(event, context) {
       timezone: 'Europe/Berlin',
       timezone_offset: 3600,
       current: {
-        dt: currentData.dt,
-        temp: currentData.main.temp,
-        weather: currentData.weather
+        dt: allHourly[0]?.dt || Math.floor(Date.now() / 1000),
+        temp: allHourly[0]?.temp || 15,
+        weather: allHourly[0]?.weather || [{ main: 'Clear', description: 'clear sky' }]
       },
       hourly: allHourly
     };
@@ -191,7 +247,7 @@ exports.handler = async function(event, context) {
     cache.data = weatherData;
     cache.timestamp = now;
 
-    console.log('Fetched and cached fresh data');
+    console.log('Fetched and cached fresh data from Open-Meteo');
     return {
       statusCode: 200,
       headers,
