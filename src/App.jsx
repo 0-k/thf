@@ -26,12 +26,11 @@ const SCORING_CONFIG = {
   kiting: {
     rain: { base: -30, probMultiplier: -15, threshold: 0.3, exponent: 1.5, maxPenalty: 20 },
     wind: {
-      veryLowPenalty: -50, veryLowThreshold: 2,
-      lowPenalty: -30, lowThreshold: 4,
-      optimalMin: 4, optimalMax: 7, optimalBonus: 20,
-      goodMin: 7, goodMax: 10, goodBonus: 10,
-      highPenalty: -20, highThreshold: 10, highMax: 12,
-      veryHighPenalty: -50, veryHighThreshold: 12
+      tooLightPenalty: -50, tooLightThreshold: 5,      // < 5 m/s: Too light
+      optimalMin: 7, optimalMax: 9, optimalBonus: 25,   // 7-9 m/s: Sweet spot
+      goodMin: 5, goodMax: 11, goodBonus: 15,           // 5-11 m/s: Workable range
+      dangerousMin: 11, dangerousMax: 13, dangerousPenalty: -25,  // 11-13 m/s: Getting dangerous
+      veryDangerousPenalty: -50, veryDangerousThreshold: 13      // > 13 m/s: Very dangerous
     },
     crowd: { multiplier: 0.35 },
     cold: { threshold: 10, maxPenalty: 40, range: 10, exponent: 1.4 },
@@ -345,18 +344,21 @@ export default function TempelhoferBikeForecast() {
     // Wind - INVERTED SCORING! Need wind for kiting
     const windSpeed = hourData.wind_speed;
     const w = config.wind;
-    if (windSpeed < w.veryLowThreshold) {
-      score += w.veryLowPenalty;
-    } else if (windSpeed < w.lowThreshold) {
-      score += w.lowPenalty;
+    if (windSpeed < w.tooLightThreshold) {
+      // < 5 m/s: Too light, insufficient power
+      score += w.tooLightPenalty;
     } else if (windSpeed >= w.optimalMin && windSpeed <= w.optimalMax) {
+      // 7-9 m/s: Sweet spot
       score += w.optimalBonus;
-    } else if (windSpeed > w.goodMin && windSpeed <= w.goodMax) {
+    } else if (windSpeed >= w.goodMin && windSpeed <= w.goodMax) {
+      // 5-11 m/s: Workable range (but not optimal)
       score += w.goodBonus;
-    } else if (windSpeed > w.highThreshold && windSpeed <= w.highMax) {
-      score += w.highPenalty;
-    } else if (windSpeed > w.veryHighThreshold) {
-      score += w.veryHighPenalty;
+    } else if (windSpeed > w.dangerousMin && windSpeed <= w.dangerousMax) {
+      // 11-13 m/s: Getting dangerous
+      score += w.dangerousPenalty;
+    } else if (windSpeed > w.veryDangerousThreshold) {
+      // > 13 m/s: Very dangerous
+      score += w.veryDangerousPenalty;
     }
 
     // Rain penalty
@@ -1109,8 +1111,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Metal frame + lightning = extreme danger</div>
                   </li>
                   <li>
-                    <strong>Wind:</strong> NEEDS WIND! 4-7 m/s = +20
-                    <div className="text-xs mt-1 ml-4">&lt;2 m/s = -50, &gt;12 m/s = -50 (too dangerous)</div>
+                    <strong>Wind:</strong> NEEDS WIND! 7-9 m/s = +25 (sweet spot)
+                    <div className="text-xs mt-1 ml-4">&lt;5 m/s = -50 (too light), 5-11 m/s = +15 (workable), &gt;13 m/s = -50 (dangerous)</div>
                   </li>
                   <li>
                     <strong>Rain:</strong> -30 base + up to -15 for probability
