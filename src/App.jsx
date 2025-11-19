@@ -1,6 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, Wind, Droplets, ThermometerSun, Users, TrendingUp, RefreshCw } from 'lucide-react';
 
+// Opening hours configuration for Tempelhofer Feld
+// Supports different periods throughout the year
+const OPENING_HOURS_CONFIG = {
+  periods: [
+    {
+      name: 'Summer',
+      startMonth: 3,  // April (0-indexed)
+      endMonth: 8,    // September (0-indexed)
+      open: 6,        // 6:00 AM
+      close: 22       // 10:00 PM
+    },
+    {
+      name: 'Winter',
+      startMonth: 9,  // October (0-indexed)
+      endMonth: 2,    // March (0-indexed) - wraps around year
+      open: 7,        // 7:00 AM
+      close: 21       // 9:00 PM
+    }
+  ]
+};
+
 // Scoring configuration for each activity
 const SCORING_CONFIG = {
   cycling: {
@@ -10,7 +31,7 @@ const SCORING_CONFIG = {
     cold: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
     heat: { threshold: 24, maxPenalty: 30, range: 11, exponent: 1.3 },
     airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 5, maxPenalty: 20, range: 6, exponent: 1.2 }
+    uv: { threshold: 3, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
   jogging: {
     rain: { base: -25, probMultiplier: -12, threshold: 0.3, exponent: 1.5, maxPenalty: 18 },
@@ -19,7 +40,7 @@ const SCORING_CONFIG = {
     cold: { threshold: 10, maxPenalty: 20, range: 10, exponent: 1.1 },
     heat: { threshold: 22, maxPenalty: 35, range: 10, exponent: 1.4 },
     airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 4, maxPenalty: 25, range: 7, exponent: 1.3 }
+    uv: { threshold: 3, maxPenalty: 25, range: 7, exponent: 1.3 }
   },
   kiting: {
     rain: { base: -30, probMultiplier: -15, threshold: 0.3, exponent: 1.5, maxPenalty: 20 },
@@ -34,16 +55,16 @@ const SCORING_CONFIG = {
     cold: { threshold: 10, maxPenalty: 40, range: 10, exponent: 1.4 },
     heat: { threshold: 30, flatPenalty: -10 },
     airQuality: { threshold: 2, maxPenalty: 15, range: 3, exponent: 1.3 },
-    uv: { threshold: 5, maxPenalty: 20, range: 6, exponent: 1.2 }
+    uv: { threshold: 4, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
-  picnic: {
+  socializing: {
     rain: { base: -60, probMultiplier: -20, threshold: 0.2, exponent: 1.6, maxPenalty: 35 },
     wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
-    crowd: { multiplier: 0.25 },  // Changed from bonus to penalty
+    crowd: { multiplier: 0.25 },
     cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
     heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.2 },
     airQuality: { threshold: 2, maxPenalty: 20, range: 3, exponent: 1.3 },
-    uv: { threshold: 4, maxPenalty: 30, range: 7, exponent: 1.3 }
+    uv: { threshold: 3, maxPenalty: 30, range: 7, exponent: 1.3 }
   }
 };
 
@@ -144,7 +165,25 @@ export default function TempelhoferBikeForecast() {
 
   const getOpeningHours = (date) => {
     const month = date.getMonth();
-    return month >= 3 && month <= 8 ? { open: 6, close: 22 } : { open: 7, close: 21 };
+
+    // Find the matching period for this month
+    for (const period of OPENING_HOURS_CONFIG.periods) {
+      // Handle periods that wrap around the year (e.g., Oct-Mar)
+      if (period.startMonth <= period.endMonth) {
+        // Normal period (doesn't wrap around year)
+        if (month >= period.startMonth && month <= period.endMonth) {
+          return { open: period.open, close: period.close };
+        }
+      } else {
+        // Period wraps around year (e.g., startMonth=9, endMonth=2 means Oct-Mar)
+        if (month >= period.startMonth || month <= period.endMonth) {
+          return { open: period.open, close: period.close };
+        }
+      }
+    }
+
+    // Fallback (should not happen if config is complete)
+    return { open: 7, close: 21 };
   };
 
   const isOpen = (hour, date) => {
@@ -168,8 +207,8 @@ export default function TempelhoferBikeForecast() {
       return calculateJoggingScore(hourData);
     } else if (activity === 'kiting') {
       return calculateKitingScore(hourData);
-    } else if (activity === 'picnic') {
-      return calculatePicnicScore(hourData);
+    } else if (activity === 'socializing') {
+      return calculateSocializingScore(hourData);
     }
     return calculateCyclingScore(hourData);
   };
@@ -188,13 +227,15 @@ export default function TempelhoferBikeForecast() {
       return 0; // Absolutely not safe
     }
 
-    // Rain penalty
+    // Rain penalty - prioritize probability with malus for actual rain
     const pop = hourData.pop;
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.base;
-      score += pop * config.rain.probMultiplier;
-    } else if (pop > config.rain.threshold) {
+    if (pop > config.rain.threshold) {
+      // Apply probability-based penalty
       score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    }
+    // Additional penalty if actually raining
+    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+      score += config.rain.probMultiplier;
     }
 
     // Wind penalty
@@ -258,13 +299,15 @@ export default function TempelhoferBikeForecast() {
       return 0; // Absolutely not safe
     }
 
-    // Rain penalty
+    // Rain penalty - prioritize probability with malus for actual rain
     const pop = hourData.pop;
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.base;
-      score += pop * config.rain.probMultiplier;
-    } else if (pop > config.rain.threshold) {
+    if (pop > config.rain.threshold) {
+      // Apply probability-based penalty
       score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    }
+    // Additional penalty if actually raining
+    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+      score += config.rain.probMultiplier;
     }
 
     // Wind penalty
@@ -345,13 +388,15 @@ export default function TempelhoferBikeForecast() {
       score += w.veryDangerousPenalty;
     }
 
-    // Rain penalty
+    // Rain penalty - prioritize probability with malus for actual rain
     const pop = hourData.pop;
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.base;
-      score += pop * config.rain.probMultiplier;
-    } else if (pop > config.rain.threshold) {
+    if (pop > config.rain.threshold) {
+      // Apply probability-based penalty
       score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    }
+    // Additional penalty if actually raining
+    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+      score += config.rain.probMultiplier;
     }
 
     // Crowd penalty
@@ -390,12 +435,12 @@ export default function TempelhoferBikeForecast() {
     return Math.max(0, Math.min(100, Math.round(score)));
   };
 
-  const calculatePicnicScore = (hourData) => {
+  const calculateSocializingScore = (hourData) => {
     let score = 100;
     const date = new Date(hourData.dt * 1000);
     const hour = date.getHours();
     const dayOfWeek = date.getDay();
-    const config = SCORING_CONFIG.picnic;
+    const config = SCORING_CONFIG.socializing;
 
     if (!isOpen(hour, date)) return 0;
 
@@ -404,13 +449,15 @@ export default function TempelhoferBikeForecast() {
       return 0; // Pack up and go home
     }
 
-    // Rain penalty - WORST for picnic
+    // Rain penalty - prioritize probability with malus for actual rain
     const pop = hourData.pop;
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.base;
-      score += pop * config.rain.probMultiplier;
-    } else if (pop > config.rain.threshold) {
+    if (pop > config.rain.threshold) {
+      // Apply probability-based penalty
       score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    }
+    // Additional penalty if actually raining
+    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+      score += config.rain.probMultiplier;
     }
 
     // Wind penalty
@@ -420,7 +467,7 @@ export default function TempelhoferBikeForecast() {
       score -= Math.min(config.wind.maxPenalty, windPenalty);
     }
 
-    // Crowd penalty (mild for picnic - crowds less of an issue)
+    // Crowd penalty (mild for socializing - crowds less of an issue)
     const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
     score -= (crowdFactor * config.crowd.multiplier);
 
@@ -461,16 +508,7 @@ export default function TempelhoferBikeForecast() {
   };
 
   const getScoreColor = (score) => {
-    if (score === 0) {
-      // Closed - grey
-      return {
-        backgroundColor: 'rgb(229, 231, 235)', // gray-200
-        borderColor: 'rgb(156, 163, 175)', // gray-400
-        color: 'rgb(55, 65, 81)' // gray-700
-      };
-    }
-
-    // Continuous gradient from green (100) → yellow (70) → red (1)
+    // Continuous gradient from green (100) → yellow (70) → red (0)
     // Using HSL for smooth color transitions
     let hue, saturation, lightness;
 
@@ -489,9 +527,9 @@ export default function TempelhoferBikeForecast() {
       saturation = 70;
       lightness = 72;
     } else {
-      // Orange to Red (35 → 1)
+      // Orange to Red (35 → 0)
       // Hue: 30 (orange) → 0 (red)
-      const t = (score - 1) / 34;
+      const t = score / 35;
       hue = 0 + t * 30;
       saturation = 75;
       lightness = 70;
@@ -504,8 +542,8 @@ export default function TempelhoferBikeForecast() {
     };
   };
 
-  const getScoreLabel = (score) => {
-    if (score === 0) return 'Closed';
+  const getScoreLabel = (score, isClosed) => {
+    if (isClosed) return 'Closed';
     if (score >= 70) return 'Good';
     if (score >= 35) return 'Fair';
     return 'Poor';
@@ -566,17 +604,22 @@ export default function TempelhoferBikeForecast() {
   }
 
   const hourlyData = forecastData.hourly;
-  const hoursWithScores = hourlyData.map(hour => ({
-    ...hour,
-    score: calculateBikeabilityScore(hour)
-  }));
+  const hoursWithScores = hourlyData.map(hour => {
+    const date = new Date(hour.dt * 1000);
+    const hourOfDay = date.getHours();
+    return {
+      ...hour,
+      score: calculateBikeabilityScore(hour),
+      isClosed: !isOpen(hourOfDay, date)
+    };
+  });
   
   const dayGroups = groupHoursByDay(hoursWithScores);
   
-  // Get top 3 times from next 3 days only (72 hours) - exclude past hours
+  // Get top 3 times from next 4 days only (96 hours) - exclude past hours
   const now = new Date();
-  const next3Days = hoursWithScores.slice(0, 72);
-  const bestTimes = next3Days
+  const next4Days = hoursWithScores.slice(0, 96);
+  const bestTimes = next4Days
     .filter(h => {
       const hourDate = new Date(h.dt * 1000);
       return h.score > 0 && hourDate >= now; // Only future hours
@@ -626,20 +669,20 @@ export default function TempelhoferBikeForecast() {
               <div className="mb-3">
                 <div
                   className="inline-block px-4 py-2 rounded-lg border-2"
-                  style={selectedHour.score > 0 ? getScoreColor(selectedHour.score) : {
+                  style={selectedHour.isClosed ? {
                     backgroundColor: 'rgb(229, 231, 235)',
                     borderColor: 'rgb(156, 163, 175)',
                     color: 'rgb(55, 65, 81)'
-                  }}
+                  } : getScoreColor(selectedHour.score)}
                 >
                   <div className="text-xs font-medium opacity-80">
                     {activity.charAt(0).toUpperCase() + activity.slice(1)} Score
                   </div>
                   <div className="text-3xl font-bold">
-                    {selectedHour.score === 0 ? 'Closed' : selectedHour.score}
+                    {selectedHour.isClosed ? '-' : selectedHour.score}
                   </div>
                   <div className="text-xs opacity-80">
-                    {getScoreLabel(selectedHour.score)}
+                    {getScoreLabel(selectedHour.score, selectedHour.isClosed)}
                   </div>
                 </div>
               </div>
@@ -688,23 +731,6 @@ export default function TempelhoferBikeForecast() {
                     {selectedHour.weather[0].description}
                   </div>
                 </div>
-
-                <div className="bg-gray-50 p-2 rounded-lg">
-                  <div className="flex items-center gap-1 text-gray-600 mb-0.5">
-                    <Cloud className="w-4 h-4" />
-                    <span className="text-xs font-medium">Air Quality</span>
-                  </div>
-                  <div className="text-xl font-bold text-gray-800">
-                    AQI {selectedHour.air_quality?.aqi || 'N/A'}
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    {selectedHour.air_quality?.aqi === 1 && 'Good'}
-                    {selectedHour.air_quality?.aqi === 2 && 'Fair'}
-                    {selectedHour.air_quality?.aqi === 3 && 'Moderate'}
-                    {selectedHour.air_quality?.aqi === 4 && 'Poor'}
-                    {selectedHour.air_quality?.aqi === 5 && 'Very Poor'}
-                  </div>
-                </div>
               </div>
 
               {/* Additional Details */}
@@ -716,24 +742,6 @@ export default function TempelhoferBikeForecast() {
                     <span className="text-gray-600">UV Index</span>
                     <span className="font-medium text-gray-800">
                       {selectedHour.uvi.toFixed(1)}
-                    </span>
-                  </div>
-                )}
-
-                {selectedHour.humidity !== undefined && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Humidity</span>
-                    <span className="font-medium text-gray-800">
-                      {selectedHour.humidity}%
-                    </span>
-                  </div>
-                )}
-
-                {selectedHour.pressure !== undefined && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Pressure</span>
-                    <span className="font-medium text-gray-800">
-                      {selectedHour.pressure} hPa
                     </span>
                   </div>
                 )}
@@ -782,10 +790,10 @@ export default function TempelhoferBikeForecast() {
                 Tempelhofer Feld
               </h1>
               <p className="text-gray-600">
-                {activity === 'cycling' && 'Cycling Forecast - Next 7 days'}
-                {activity === 'jogging' && 'Jogging Forecast - Next 7 days'}
-                {activity === 'kiting' && 'Kiting Forecast - Next 7 days'}
-                {activity === 'picnic' && 'Picnic Forecast - Next 7 days'}
+                {activity === 'cycling' && 'Cycling Forecast - Next 4 Days'}
+                {activity === 'jogging' && 'Jogging Forecast - Next 4 Days'}
+                {activity === 'kiting' && 'Kiting Forecast - Next 4 Days'}
+                {activity === 'socializing' && 'Socializing Forecast - Next 4 Days'}
               </p>
             </div>
             <button
@@ -831,14 +839,14 @@ export default function TempelhoferBikeForecast() {
               Kiting
             </button>
             <button
-              onClick={() => setActivity('picnic')}
+              onClick={() => setActivity('socializing')}
               className={`px-4 py-2.5 rounded-lg font-semibold transition-all text-sm md:text-base ${
-                activity === 'picnic'
+                activity === 'socializing'
                   ? 'bg-orange-600 text-white shadow-md'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Picnic
+              Socializing
             </button>
           </div>
           
@@ -863,7 +871,7 @@ export default function TempelhoferBikeForecast() {
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-6 h-6 text-green-600" />
-            <h2 className="text-xl font-bold text-gray-800">Top 3 Best Times (Next 3 Days)</h2>
+            <h2 className="text-xl font-bold text-gray-800">Top 3 Best Times (Next 4 Days)</h2>
           </div>
           <div className="flex justify-center">
             <div className="grid grid-cols-3 gap-4">
@@ -903,10 +911,6 @@ export default function TempelhoferBikeForecast() {
                           <Droplets className="w-3 h-3" />
                           <span>{Math.round(hour.pop * 100)}%</span>
                         </div>
-                        <div className="flex items-center justify-center gap-1">
-                          <Cloud className="w-3 h-3" />
-                          <span>{hour.air_quality ? `AQI ${hour.air_quality.aqi}` : 'AQI N/A'}</span>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -918,7 +922,7 @@ export default function TempelhoferBikeForecast() {
 
         {/* Daily Forecasts - Clean 2-Row Layout */}
         <div className="space-y-6">
-          {Object.entries(dayGroups).slice(0, 3).map(([day, hours]) => {
+          {Object.entries(dayGroups).slice(0, 4).map(([day, hours]) => {
             // Split hours into two rows
             const midpoint = Math.ceil(hours.length / 2);
             const morningHours = hours.slice(0, midpoint);
@@ -938,20 +942,20 @@ export default function TempelhoferBikeForecast() {
                 hour.weather[0].main
               );
 
-              const colors = hour.score > 0 ? getScoreColor(hour.score) : {};
+              const colors = hour.isClosed ? {
+                backgroundColor: 'rgb(229, 231, 235)',
+                borderColor: 'rgb(156, 163, 175)',
+                color: 'rgb(55, 65, 81)'
+              } : getScoreColor(hour.score);
 
               return (
                 <div
                   key={hour.dt}
                   onClick={() => setSelectedHour(hour)}
                   className={`border-2 rounded-lg p-1.5 transition-all hover:scale-105 cursor-pointer ${
-                    showGreyedOut
-                      ? 'opacity-40'
-                      : hour.score === 0
-                      ? 'border-gray-300 bg-gray-50 opacity-40'
-                      : ''
+                    showGreyedOut ? 'opacity-40' : hour.isClosed ? 'opacity-40' : ''
                   }`}
-                  style={hour.score > 0 ? colors : {}}
+                  style={colors}
                 >
                   <div className="flex flex-col items-center mb-0.5">
                     <div className={`text-[10px] font-semibold w-full text-center ${
@@ -960,9 +964,9 @@ export default function TempelhoferBikeForecast() {
                       {date.getHours().toString().padStart(2, '0')}:00
                     </div>
                     <div className={`text-lg font-bold leading-tight ${
-                      showGreyedOut ? 'text-gray-400' : hour.score === 0 ? 'text-gray-400' : ''
+                      showGreyedOut ? 'text-gray-400' : ''
                     }`}>
-                      {hour.score === 0 ? '-' : hour.score}
+                      {hour.isClosed ? '-' : hour.score}
                     </div>
                   </div>
                   
@@ -1010,7 +1014,7 @@ export default function TempelhoferBikeForecast() {
             How the Score Works for {activity === 'cycling' && 'Cycling'}
             {activity === 'jogging' && 'Jogging'}
             {activity === 'kiting' && 'Kiting'}
-            {activity === 'picnic' && 'Picnic'}
+            {activity === 'socializing' && 'Socializing'}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
             <div>
@@ -1046,8 +1050,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">1=Good (0), 2=Fair (-5), 3=Moderate (-12), 4=Poor (-22)</div>
                   </li>
                   <li>
-                    <strong>UV Index:</strong> Gradual above 5
-                    <div className="text-xs mt-1 ml-4">6 = -3, 8 = -10, 10 = -17, 11+ = -20</div>
+                    <strong>UV Index:</strong> Gradual above 3
+                    <div className="text-xs mt-1 ml-4">4 = -3, 6 = -10, 8 = -17, 9+ = -20</div>
                   </li>
                 </ul>
               ) : activity === 'jogging' ? (
@@ -1058,27 +1062,27 @@ export default function TempelhoferBikeForecast() {
                   </li>
                   <li>
                     <strong>Rain:</strong> -25 base + up to -12 for probability
-                    <div className="text-xs mt-1 ml-4">Many runners don't mind light rain</div>
+                    <div className="text-xs mt-1 ml-4">Light rain tolerable for running</div>
                   </li>
                   <li>
                     <strong>Wind:</strong> Gradual from 5 m/s (max -15)
-                    <div className="text-xs mt-1 ml-4">Much less affected than cycling</div>
+                    <div className="text-xs mt-1 ml-4">Lower impact on running performance</div>
                   </li>
                   <li>
                     <strong>Crowds:</strong> Up to -10 points
-                    <div className="text-xs mt-1 ml-4">Easier to navigate than on a bike</div>
+                    <div className="text-xs mt-1 ml-4">Easy to navigate around people</div>
                   </li>
                   <li>
                     <strong>Cold:</strong> Gradual below 10°C (max -20)
-                    <div className="text-xs mt-1 ml-4">You warm up while running</div>
+                    <div className="text-xs mt-1 ml-4">Body heats up during activity</div>
                   </li>
                   <li>
                     <strong>Heat:</strong> Gradual above 22°C (max -35)
                     <div className="text-xs mt-1 ml-4">25°C = -8, 28°C = -18, 30°C = -27 (overheating risk!)</div>
                   </li>
                   <li>
-                    <strong>UV Index:</strong> Gradual above 4 (max -25)
-                    <div className="text-xs mt-1 ml-4">More exposed, slower, longer duration</div>
+                    <strong>UV Index:</strong> Gradual above 3 (max -25)
+                    <div className="text-xs mt-1 ml-4">Extended exposure during outdoor activity</div>
                   </li>
                 </ul>
               ) : activity === 'kiting' ? (
@@ -1104,7 +1108,7 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">5°C = -18, 0°C = -32, -5°C = -40 (cold hands hurt control)</div>
                   </li>
                   <li>
-                    <strong>UV Index:</strong> Gradual above 5 (max -20)
+                    <strong>UV Index:</strong> Gradual above 4 (max -20)
                     <div className="text-xs mt-1 ml-4">Standing outside for hours</div>
                   </li>
                 </ul>
@@ -1120,11 +1124,11 @@ export default function TempelhoferBikeForecast() {
                   </li>
                   <li>
                     <strong>Wind:</strong> Gradual above 3 m/s (max -40)
-                    <div className="text-xs mt-1 ml-4">Flies blankets, ruins setup</div>
+                    <div className="text-xs mt-1 ml-4">Disrupts setup and comfort</div>
                   </li>
                   <li>
                     <strong>Crowds:</strong> Up to -25 points
-                    <div className="text-xs mt-1 ml-4">Mild penalty (less of an issue than for cycling)</div>
+                    <div className="text-xs mt-1 ml-4">Reduced impact on stationary activities</div>
                   </li>
                   <li>
                     <strong>Cold:</strong> Gradual below 15°C (max -35)
@@ -1135,8 +1139,8 @@ export default function TempelhoferBikeForecast() {
                     <div className="text-xs mt-1 ml-4">Too hot for sitting in sun</div>
                   </li>
                   <li>
-                    <strong>UV Index:</strong> Gradual above 4 (max -30)
-                    <div className="text-xs mt-1 ml-4">Sitting in sun for extended periods</div>
+                    <strong>UV Index:</strong> Gradual above 3 (max -30)
+                    <div className="text-xs mt-1 ml-4">Extended sun exposure while stationary</div>
                   </li>
                 </ul>
               )}

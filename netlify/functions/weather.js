@@ -204,17 +204,19 @@ exports.handler = async function(event, context) {
     const nowDate = new Date();
     const midnightToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), 0, 0, 0);
     const midnightTimestamp = Math.floor(midnightToday.getTime() / 1000);
+    const currentTimestamp = Math.floor(nowDate.getTime() / 1000);
 
     // Combine historical (past hours of today) + forecast
     let allHourly = [];
 
     if (historicalData) {
-      // Get only past hours of today from historical data
+      // Get ALL hours from midnight onwards (includes past hours of today)
       const historicalHourly = convertHourlyData(historicalData);
-      const pastHoursToday = historicalHourly.filter(h => {
-        return h.dt >= midnightTimestamp && h.dt < Math.floor(nowDate.getTime() / 1000);
+      const todayHours = historicalHourly.filter(h => {
+        // Include from midnight up to (but not including) current hour
+        return h.dt >= midnightTimestamp && h.dt < currentTimestamp;
       });
-      allHourly = pastHoursToday;
+      allHourly = todayHours;
     }
 
     // Add forecast data (includes current hour onwards)
