@@ -1,11 +1,152 @@
 /**
  * Scoring utilities for Tempelhofer Feld Activity Forecast
  * Extracted from App.jsx for testability
+ * TypeScript version with full type safety
  */
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+export interface OpeningHoursPeriod {
+  name: string;
+  startMonth: number;
+  endMonth: number;
+  open: number;
+  close: number;
+}
+
+export interface OpeningHoursConfig {
+  periods: OpeningHoursPeriod[];
+}
+
+export interface RainConfig {
+  base: number;
+  probMultiplier: number;
+  threshold: number;
+  exponent: number;
+  maxPenalty: number;
+}
+
+export interface StandardWindConfig {
+  threshold: number;
+  maxPenalty: number;
+  range: number;
+  exponent: number;
+}
+
+export interface KitingWindConfig {
+  tooLightPenalty: number;
+  tooLightThreshold: number;
+  optimalMin: number;
+  optimalMax: number;
+  workableMin: number;
+  workableMax: number;
+  dangerousMin: number;
+  dangerousMax: number;
+  dangerousPenalty: number;
+  veryDangerousPenalty: number;
+  veryDangerousThreshold: number;
+}
+
+export interface CrowdConfig {
+  multiplier: number;
+}
+
+export interface TempConfig {
+  threshold: number;
+  maxPenalty: number;
+  range: number;
+  exponent: number;
+}
+
+export interface FlatTempConfig {
+  threshold: number;
+  flatPenalty: number;
+}
+
+export interface AirQualityConfig {
+  threshold: number;
+  maxPenalty: number;
+  range: number;
+  exponent: number;
+}
+
+export interface UVConfig {
+  threshold: number;
+  maxPenalty: number;
+  range: number;
+  exponent: number;
+}
+
+export interface StandardActivityConfig {
+  rain: RainConfig;
+  wind: StandardWindConfig;
+  crowd: CrowdConfig;
+  cold: TempConfig;
+  heat: TempConfig;
+  airQuality: AirQualityConfig;
+  uv: UVConfig;
+}
+
+export interface KitingActivityConfig {
+  rain: RainConfig;
+  wind: KitingWindConfig;
+  crowd: CrowdConfig;
+  cold: TempConfig;
+  heat: FlatTempConfig;
+  airQuality: AirQualityConfig;
+  uv: UVConfig;
+}
+
+export interface ScoringConfig {
+  cycling: StandardActivityConfig;
+  jogging: StandardActivityConfig;
+  kiting: KitingActivityConfig;
+  socializing: StandardActivityConfig;
+}
+
+export interface WeatherCondition {
+  main: string;
+  description: string;
+}
+
+export interface AirQuality {
+  aqi: number;
+}
+
+export interface HourData {
+  dt: number;
+  temp: number;
+  feels_like?: number;
+  pressure?: number;
+  humidity?: number;
+  dew_point?: number;
+  uvi?: number;
+  clouds?: number;
+  visibility?: number;
+  wind_speed: number;
+  wind_deg?: number;
+  wind_gust?: number;
+  weather: WeatherCondition[];
+  pop: number;
+  rain?: { '1h': number };
+  air_quality?: AirQuality;
+  hasThunderstorm: boolean;
+}
+
+export interface OpeningHours {
+  open: number;
+  close: number;
+}
+
+// ============================================================================
+// Configuration
+// ============================================================================
 
 // Opening hours configuration for Tempelhofer Feld
 // Supports different periods throughout the year
-export const OPENING_HOURS_CONFIG = {
+export const OPENING_HOURS_CONFIG: OpeningHoursConfig = {
   periods: [
     {
       name: 'Summer',
@@ -25,7 +166,7 @@ export const OPENING_HOURS_CONFIG = {
 };
 
 // Scoring configuration for each activity
-export const SCORING_CONFIG = {
+export const SCORING_CONFIG: ScoringConfig = {
   cycling: {
     rain: { base: -40, probMultiplier: -20, threshold: 0.2, exponent: 1.5, maxPenalty: 25 },
     wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
@@ -70,7 +211,11 @@ export const SCORING_CONFIG = {
   }
 };
 
-export const getOpeningHours = (date) => {
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+export const getOpeningHours = (date: Date): OpeningHours => {
   const month = date.getMonth();
 
   // Find the matching period for this month
@@ -93,12 +238,17 @@ export const getOpeningHours = (date) => {
   return { open: 7, close: 21 };
 };
 
-export const isOpen = (hour, date) => {
+export const isOpen = (hour: number, date: Date): boolean => {
   const hours = getOpeningHours(date);
   return hour >= hours.open && hour < hours.close;
 };
 
-export const calculateCrowdFactor = (hour, dayOfWeek, temp, weatherCondition) => {
+export const calculateCrowdFactor = (
+  hour: number,
+  dayOfWeek: number,
+  temp: number,
+  weatherCondition: string
+): number => {
   let crowdScore = 0;
   if (dayOfWeek === 0 || dayOfWeek === 6) crowdScore += 30;
   if (hour >= 11 && hour <= 18) crowdScore += 25;
@@ -109,7 +259,11 @@ export const calculateCrowdFactor = (hour, dayOfWeek, temp, weatherCondition) =>
   return Math.max(0, Math.min(100, crowdScore));
 };
 
-export const calculateCyclingScore = (hourData) => {
+// ============================================================================
+// Scoring Functions
+// ============================================================================
+
+export const calculateCyclingScore = (hourData: HourData): number => {
   let score = 100;
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
@@ -119,7 +273,7 @@ export const calculateCyclingScore = (hourData) => {
   if (!isOpen(hour, date)) return 0;
 
   // Thunderstorm penalty - CRITICAL (exposed area)
-  if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
+  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
     return 0; // Absolutely not safe
   }
 
@@ -130,7 +284,7 @@ export const calculateCyclingScore = (hourData) => {
     score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
   }
   // Additional penalty if actually raining
-  if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
     score += config.rain.probMultiplier;
   }
 
@@ -142,7 +296,7 @@ export const calculateCyclingScore = (hourData) => {
   }
 
   // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties
@@ -181,7 +335,7 @@ export const calculateCyclingScore = (hourData) => {
   return Math.max(0, Math.min(100, Math.round(score)));
 };
 
-export const calculateJoggingScore = (hourData) => {
+export const calculateJoggingScore = (hourData: HourData): number => {
   let score = 100;
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
@@ -191,7 +345,7 @@ export const calculateJoggingScore = (hourData) => {
   if (!isOpen(hour, date)) return 0;
 
   // Thunderstorm penalty - CRITICAL (exposed area)
-  if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
+  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
     return 0; // Absolutely not safe
   }
 
@@ -202,7 +356,7 @@ export const calculateJoggingScore = (hourData) => {
     score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
   }
   // Additional penalty if actually raining
-  if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
     score += config.rain.probMultiplier;
   }
 
@@ -214,7 +368,7 @@ export const calculateJoggingScore = (hourData) => {
   }
 
   // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties
@@ -253,7 +407,7 @@ export const calculateJoggingScore = (hourData) => {
   return Math.max(0, Math.min(100, Math.round(score)));
 };
 
-export const calculateKitingScore = (hourData) => {
+export const calculateKitingScore = (hourData: HourData): number => {
   let score = 100;
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
@@ -263,7 +417,7 @@ export const calculateKitingScore = (hourData) => {
   if (!isOpen(hour, date)) return 0;
 
   // Thunderstorm penalty - EXTREMELY CRITICAL for kiting (metal frame + lightning)
-  if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
+  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
     return 0; // Deadly combination
   }
 
@@ -291,12 +445,12 @@ export const calculateKitingScore = (hourData) => {
     score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
   }
   // Additional penalty if actually raining
-  if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
     score += config.rain.probMultiplier;
   }
 
   // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties
@@ -331,7 +485,7 @@ export const calculateKitingScore = (hourData) => {
   return Math.max(0, Math.min(100, Math.round(score)));
 };
 
-export const calculateSocializingScore = (hourData) => {
+export const calculateSocializingScore = (hourData: HourData): number => {
   let score = 100;
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
@@ -341,7 +495,7 @@ export const calculateSocializingScore = (hourData) => {
   if (!isOpen(hour, date)) return 0;
 
   // Thunderstorm penalty - ruins everything
-  if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
+  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
     return 0; // Pack up and go home
   }
 
@@ -352,7 +506,7 @@ export const calculateSocializingScore = (hourData) => {
     score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
   }
   // Additional penalty if actually raining
-  if (hourData.weather[0].main.toLowerCase().includes('rain')) {
+  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
     score += config.rain.probMultiplier;
   }
 
@@ -364,7 +518,7 @@ export const calculateSocializingScore = (hourData) => {
   }
 
   // Crowd penalty (mild for socializing - crowds less of an issue)
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties

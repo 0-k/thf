@@ -9,7 +9,8 @@ import {
   calculateJoggingScore,
   calculateKitingScore,
   calculateSocializingScore,
-} from './scoring.js';
+  type HourData,
+} from './scoring';
 
 describe('Opening Hours Logic', () => {
   describe('getOpeningHours', () => {
