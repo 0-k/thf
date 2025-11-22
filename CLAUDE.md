@@ -4,8 +4,8 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 
 ## Project Status
 
-**Current State:** Production with Open-Meteo API + Netlify Functions
-**Next Steps:** Implement scheduled functions + persistent storage → Testing → TypeScript
+**Current State:** Production with Open-Meteo API + Netlify Functions + Netlify Blobs + Scheduled Updates
+**Next Steps:** Testing Infrastructure (Phase 2) → TypeScript Migration (Phase 3)
 
 ## Tech Stack
 
@@ -18,6 +18,7 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 
 - `src/App.jsx` - Main React app with 4 activities (cycling/jogging/kiting/picnic)
 - `netlify/functions/weather.js` - Serverless API endpoint for weather data
+- `netlify/functions/scheduled-weather-update.js` - Scheduled function (runs hourly) to update weather cache
 - `SCORING_CONFIG` - Externalized scoring configuration (top of App.jsx)
 - `netlify.toml` - Netlify deployment configuration
 - `vite.config.js` - Vite bundler configuration
@@ -35,11 +36,12 @@ Four activity-specific scoring functions:
 - `calculatePicnicScore()` - Rain -60, Wind -40, Cold -35 (15°C), UV -30
 
 ### Data Flow
-1. Frontend requests weather data from Netlify Function
-2. Function fetches from Open-Meteo API (hourly, 7 days)
-3. In-memory cache (1 hour) reduces API calls
-4. Past hours backfilled using Open-Meteo historical API
-5. Frontend applies scoring algorithms client-side
+1. Scheduled function fetches weather data every hour and stores in Netlify Blobs (persistent cache)
+2. Frontend requests weather data from Netlify Function
+3. Function serves from Netlify Blobs (fast, persistent across function instances)
+4. If cache is stale (>1 hour), function fetches fresh data from Open-Meteo API
+5. Past hours backfilled using Open-Meteo historical API
+6. Frontend applies scoring algorithms client-side
 
 ### Layout
 - 2-row grid per day (2x12 on desktop, 2x6 on mobile)
@@ -50,25 +52,23 @@ Four activity-specific scoring functions:
 
 ## Roadmap: Professional Robustness
 
-### Phase 1: Data Infrastructure (IN PROGRESS)
+### Phase 1: Data Infrastructure (COMPLETED ✅)
 **Goal:** Reliable, high-quality weather data with proper persistence
 
 ✅ **Completed:**
 - Switch to Open-Meteo API (free, unlimited, hourly forecasts up to 16 days)
 - No API key management needed
 - True hourly data (not 3-hour intervals)
-
-🔲 **Next:**
 - Implement Netlify Blobs for persistent caching across function instances
 - Add scheduled function (cron) to fetch weather every hour in background
 - Use Open-Meteo historical API for proper past hours (no interpolation)
-- Store 7 days of forecast data persistently
+- Store 7 days of forecast data persistently in Netlify Blobs
 
-**Benefits:**
-- Eliminates cold starts and inconsistent caching
-- Always-fast responses (served from blob storage)
-- More reliable than in-memory cache per function instance
-- Reduces API calls to 24/day (scheduled fetches only)
+**Benefits Achieved:**
+- Eliminates cold starts and inconsistent caching ✅
+- Always-fast responses (served from blob storage) ✅
+- More reliable than in-memory cache per function instance ✅
+- Reduces API calls to 24/day (scheduled fetches only) ✅
 
 ### Phase 2: Testing Infrastructure
 **Goal:** Prevent regressions, ensure scoring accuracy

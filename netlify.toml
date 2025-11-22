@@ -13,3 +13,9 @@
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+
+# Scheduled function to update weather data hourly
+# Runs every hour at :00 minutes (cron: "0 * * * *")
+[[functions]]
+  name = "scheduled-weather-update"
+  schedule = "@hourly"
