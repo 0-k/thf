@@ -17,9 +17,11 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 ## Key Files
 
 - `src/App.jsx` - Main React app with 4 activities (cycling/jogging/kiting/picnic)
+- `src/utils/scoring.js` - Scoring logic and configuration (extracted for testability)
+- `src/utils/scoring.test.js` - Comprehensive unit tests (63 tests)
 - `netlify/functions/weather.js` - Serverless API endpoint for weather data
 - `netlify/functions/scheduled-weather-update.js` - Scheduled function (runs hourly) to update weather cache
-- `SCORING_CONFIG` - Externalized scoring configuration (top of App.jsx)
+- `vitest.config.js` - Vitest testing configuration
 - `netlify.toml` - Netlify deployment configuration
 - `vite.config.js` - Vite bundler configuration
 - `tailwind.config.js` - Tailwind CSS configuration
@@ -70,27 +72,36 @@ Four activity-specific scoring functions:
 - More reliable than in-memory cache per function instance ✅
 - Reduces API calls to 24/day (scheduled fetches only) ✅
 
-### Phase 2: Testing Infrastructure
+### Phase 2: Testing Infrastructure (IN PROGRESS)
 **Goal:** Prevent regressions, ensure scoring accuracy
 
-🔲 **To Implement:**
-- Unit tests for all scoring functions (Vitest)
-  - Test edge cases (0°C, 40°C, 15 m/s wind, etc.)
-  - Verify penalty calculations match config
-  - Test opening hours logic
+✅ **Completed:**
+- Set up Vitest testing framework with jsdom and React Testing Library
+- Extracted scoring functions into testable `src/utils/scoring.js` module
+- Written 63 comprehensive unit tests covering:
+  - Opening hours logic (summer/winter, wraparound periods)
+  - Crowd factor calculation
+  - All 4 activity scoring functions (cycling, jogging, kiting, socializing)
+  - Edge cases (extreme temps, high wind, thunderstorms, etc.)
+  - Penalty calculations and threshold behavior
+  - Score bounds (0-100) and integer return values
+- All tests passing (63/63) ✅
+
+🔲 **Next:**
+- Update App.jsx to import from scoring module (refactoring)
 - Integration tests for weather API function
   - Mock Open-Meteo responses
-  - Test cache behavior
+  - Test blob storage cache behavior
   - Test error handling
 - React Error Boundaries for graceful UI degradation
-- Sentry or similar for production error tracking
 - Better loading/error states in UI
+- Optional: Sentry or similar for production error tracking
 
-**Benefits:**
-- Catch scoring bugs before deployment
-- Confidence when tuning penalty values
-- Production monitoring and alerts
-- Professional-grade reliability
+**Benefits Achieved:**
+- Scoring functions now fully tested and verifiable ✅
+- Can catch regressions when tuning penalty values ✅
+- Edge cases documented and validated ✅
+- Foundation for continuous integration ✅
 
 ### Phase 3: TypeScript Migration
 **Goal:** Type safety, better developer experience, self-documenting code
