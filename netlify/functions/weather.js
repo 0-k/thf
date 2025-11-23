@@ -3,8 +3,8 @@
  * Fetches weather data from Open-Meteo (free, no API key needed)
  */
 
-const fetch = require('node-fetch');
-const { getStore } = require('@netlify/blobs');
+import fetch from 'node-fetch';
+import { getStore } from '@netlify/blobs';
 
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const TEMPELHOFER_LAT = 52.4732;
@@ -39,7 +39,7 @@ function mapWeatherCode(code) {
   return WMO_WEATHER_CODES[code] || { main: 'Unknown', description: 'unknown' };
 }
 
-exports.handler = async function(event, context) {
+export const handler = async function(event, context) {
   // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',

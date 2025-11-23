@@ -4,9 +4,9 @@
  * This ensures fast responses from the weather API function
  */
 
-const fetch = require('node-fetch');
-const { getStore } = require('@netlify/blobs');
-const { schedule } = require('@netlify/functions');
+import fetch from 'node-fetch';
+import { getStore } from '@netlify/blobs';
+import { schedule } from '@netlify/functions';
 
 const TEMPELHOFER_LAT = 52.4732;
 const TEMPELHOFER_LON = 13.4053;
@@ -198,7 +198,7 @@ async function fetchAndCacheWeatherData() {
 }
 
 // Export the scheduled handler
-const handler = schedule('0 * * * *', async () => {
+export const handler = schedule('0 * * * *', async () => {
   try {
     await fetchAndCacheWeatherData();
     console.log('Scheduled weather update completed successfully');
@@ -207,5 +207,3 @@ const handler = schedule('0 * * * *', async () => {
     throw error;
   }
 });
-
-module.exports = { handler };
