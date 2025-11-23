@@ -350,7 +350,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     const berlinOffset = 60; // Berlin is UTC+1 or UTC+2, we'll use the data to determine actual day boundary
 
     // Get current timestamp
-    const currentTimestamp = Math.floor(nowDate.getTime() / 1000);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
 
     // Combine historical (past hours of today) + forecast
     let allHourly: HourlyData[] = [];
@@ -359,18 +359,55 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       // Get ALL hours from historical data
       const historicalHourly = convertHourlyData(historicalData);
 
-      // Find midnight of current day in Berlin time by looking at the data
-      // Get the date boundary: find the earliest hour that's today in Berlin time
-      const nowInBerlin = new Date(nowDate.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
-      const midnightBerlin = new Date(nowInBerlin.getFullYear(), nowInBerlin.getMonth(), nowInBerlin.getDate(), 0, 0, 0);
-      // Convert back to UTC timestamp by adding Berlin offset
-      const berlinTimezoneOffset = nowDate.getTimezoneOffset() - nowInBerlin.getTimezoneOffset();
-      const midnightTimestamp = Math.floor((midnightBerlin.getTime() - berlinTimezoneOffset * 60 * 1000) / 1000);
+      // The API returns times in Berlin timezone. We need to find midnight of today in Berlin.
+      // Since the server runs in UTC and Date constructor creates dates in local timezone,
+      // we calculate Berlin's midnight by using the UTC offset.
 
-      const todayHours = historicalHourly.filter(h => {
-        // Include from midnight (Berlin time) up to (but not including) current hour
-        return h.dt >= midnightTimestamp && h.dt < currentTimestamp;
+      // Get current date in Berlin time
+      const berlinTimeStr = new Date().toLocaleString('en-US', {
+        timeZone: 'Europe/Berlin',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
       });
+
+      // Parse Berlin time string to get date parts
+      const [datePart, timePart] = berlinTimeStr.split(', ');
+      const [month, day, year] = datePart.split('/');
+
+      // Create a string for midnight today in Berlin (ISO format)
+      const midnightBerlinStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+
+      // Now we need to find what this translates to in UTC
+      // Berlin is UTC+1 (winter) or UTC+2 (summer)
+      // So midnight in Berlin is either 23:00 UTC (winter) or 22:00 UTC (summer) the previous day
+
+      // The easiest way: look through the historical data and find the entry where
+      // the time string indicates midnight (00:00) in Berlin timezone
+      const todayHours = historicalHourly.filter(h => {
+        // The timestamp is UTC. We need to check if this timestamp corresponds to
+        // a time >= midnight today in Berlin and < current time
+        const hourDate = new Date(h.dt * 1000);
+        const berlinHourStr = hourDate.toLocaleString('en-US', {
+          timeZone: 'Europe/Berlin',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour12: false
+        });
+
+        // Extract just the date part (MM/DD/YYYY)
+        const [berlinDate] = berlinHourStr.split(', ');
+        const currentBerlinDate = datePart;
+
+        // Include this hour if it's today in Berlin and not in the future
+        return berlinDate === currentBerlinDate && h.dt < currentTimestamp;
+      });
+
       allHourly = todayHours;
     }
 
