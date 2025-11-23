@@ -3,6 +3,14 @@
   publish = "dist"
   functions = "netlify/functions"
 
+# Deploy previews for all branches (enables testing before merging)
+[context.deploy-preview]
+  command = "npm run build"
+
+# Branch deploys for claude/* branches (staging environment)
+[context.branch-deploy]
+  command = "npm run build"
+
 [dev]
   command = "npm run dev"
   port = 3000
