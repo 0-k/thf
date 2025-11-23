@@ -13,7 +13,3 @@
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
-
-# Scheduled functions are automatically detected by Netlify
-# The schedule is defined in the function file itself using @netlify/functions
-# No additional configuration needed here - Netlify will auto-detect scheduled-weather-update.js

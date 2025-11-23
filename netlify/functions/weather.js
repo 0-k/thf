@@ -3,8 +3,13 @@
  * Fetches weather data from Open-Meteo (free, no API key needed)
  */
 
-import fetch from 'node-fetch';
-import { getStore } from '@netlify/blobs';
+const fetch = require('node-fetch');
+
+// In-memory cache (simple solution for serverless)
+let cache = {
+  data: null,
+  timestamp: null
+};
 
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const TEMPELHOFER_LAT = 52.4732;
@@ -39,7 +44,7 @@ function mapWeatherCode(code) {
   return WMO_WEATHER_CODES[code] || { main: 'Unknown', description: 'unknown' };
 }
 
-export const handler = async function(event, context) {
+exports.handler = async function(event, context) {
   // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -67,28 +72,20 @@ export const handler = async function(event, context) {
   }
 
   try {
-    // Initialize blob store
-    const store = getStore('weather-cache');
-
-    // Check if we have valid cached data in blob storage
+    // Check if we have valid cached data
     const now = Date.now();
-    const cachedBlob = await store.get('weather-data', { type: 'json' });
-
-    if (cachedBlob && cachedBlob.data && cachedBlob.timestamp) {
-      const cacheAge = now - cachedBlob.timestamp;
-      if (cacheAge < CACHE_DURATION) {
-        console.log(`Returning cached data from blob storage (age: ${Math.round(cacheAge / 1000 / 60)} minutes)`);
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            success: true,
-            data: cachedBlob.data,
-            cached: true,
-            cached_at: new Date(cachedBlob.timestamp).toISOString()
-          })
-        };
-      }
+    if (cache.data && cache.timestamp && (now - cache.timestamp < CACHE_DURATION)) {
+      console.log(`Returning cached data (age: ${Math.round((now - cache.timestamp) / 1000 / 60)} minutes)`);
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          data: cache.data,
+          cached: true,
+          cached_at: new Date(cache.timestamp).toISOString()
+        })
+      };
     }
 
     // Build Open-Meteo API URL for forecast
@@ -114,10 +111,6 @@ export const handler = async function(event, context) {
     forecastUrl.searchParams.set('wind_speed_unit', 'ms'); // Get m/s instead of km/h
 
     // Fetch past 24 hours for today's historical data
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
     const historicalUrl = new URL('https://api.open-meteo.com/v1/forecast');
     historicalUrl.searchParams.set('latitude', TEMPELHOFER_LAT);
     historicalUrl.searchParams.set('longitude', TEMPELHOFER_LON);
@@ -250,17 +243,11 @@ export const handler = async function(event, context) {
       hourly: allHourly
     };
 
-    // Save to blob storage
-    await store.set('weather-data', JSON.stringify({
-      data: weatherData,
-      timestamp: now
-    }), {
-      metadata: {
-        fetched_at: new Date(now).toISOString()
-      }
-    });
+    // Update cache
+    cache.data = weatherData;
+    cache.timestamp = now;
 
-    console.log('Fetched and cached fresh data to blob storage');
+    console.log('Fetched and cached fresh data from Open-Meteo');
     return {
       statusCode: 200,
       headers,
