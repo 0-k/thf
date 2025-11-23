@@ -350,7 +350,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     const berlinOffset = 60; // Berlin is UTC+1 or UTC+2, we'll use the data to determine actual day boundary
 
     // Get current timestamp
-    const currentTimestamp = Math.floor(nowDate.getTime() / 1000);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
 
     // Combine historical (past hours of today) + forecast
     let allHourly: HourlyData[] = [];
@@ -359,18 +359,26 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       // Get ALL hours from historical data
       const historicalHourly = convertHourlyData(historicalData);
 
-      // Find midnight of current day in Berlin time by looking at the data
-      // Get the date boundary: find the earliest hour that's today in Berlin time
-      const nowInBerlin = new Date(nowDate.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
-      const midnightBerlin = new Date(nowInBerlin.getFullYear(), nowInBerlin.getMonth(), nowInBerlin.getDate(), 0, 0, 0);
-      // Convert back to UTC timestamp by adding Berlin offset
-      const berlinTimezoneOffset = nowDate.getTimezoneOffset() - nowInBerlin.getTimezoneOffset();
-      const midnightTimestamp = Math.floor((midnightBerlin.getTime() - berlinTimezoneOffset * 60 * 1000) / 1000);
+      // Simple approach: Include ALL historical hours that match today's date in Berlin
+      // The API returns data in Berlin timezone, so we just need to check the date
+
+      // Get today's date in Berlin (YYYY-MM-DD format)
+      const berlinDateFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Berlin',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const todayBerlinDate = berlinDateFormatter.format(new Date());
 
       const todayHours = historicalHourly.filter(h => {
-        // Include from midnight (Berlin time) up to (but not including) current hour
-        return h.dt >= midnightTimestamp && h.dt < currentTimestamp;
+        // Convert this hour's timestamp to Berlin date
+        const hourBerlinDate = berlinDateFormatter.format(new Date(h.dt * 1000));
+
+        // Include if it's today in Berlin and not in the future
+        return hourBerlinDate === todayBerlinDate && h.dt < currentTimestamp;
       });
+
       allHourly = todayHours;
     }
 
