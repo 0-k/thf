@@ -1,12 +1,16 @@
 /**
  * Netlify Function: Weather API
  * Fetches weather data from Open-Meteo (free, no API key needed)
+ *
+ * Caching strategy:
+ * - Tries Netlify Blobs (persistent, shared across instances) if available
+ * - Falls back to in-memory cache if Blobs not configured
  */
 
 const fetch = require('node-fetch');
 
-// In-memory cache (simple solution for serverless)
-let cache = {
+// In-memory cache fallback
+let memoryCache = {
   data: null,
   timestamp: null
 };
@@ -14,6 +18,74 @@ let cache = {
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const TEMPELHOFER_LAT = 52.4732;
 const TEMPELHOFER_LON = 13.4053;
+
+// Lazy-load Netlify Blobs (only if available)
+let blobStore = null;
+let blobsAvailable = null;
+
+async function initBlobStore() {
+  if (blobsAvailable === false) return null;
+  if (blobStore) return blobStore;
+
+  try {
+    const { getStore } = require('@netlify/blobs');
+    blobStore = getStore('weather-cache');
+    blobsAvailable = true;
+    console.log('✅ Netlify Blobs initialized successfully');
+    return blobStore;
+  } catch (error) {
+    blobsAvailable = false;
+    console.log('⚠️  Netlify Blobs not available, using in-memory cache:', error.message);
+    return null;
+  }
+}
+
+async function getFromCache() {
+  const store = await initBlobStore();
+
+  if (store) {
+    try {
+      const cachedBlob = await store.get('weather-data', { type: 'json' });
+      if (cachedBlob && cachedBlob.data && cachedBlob.timestamp) {
+        return cachedBlob;
+      }
+    } catch (error) {
+      console.log('Blob cache read failed, falling back to memory:', error.message);
+    }
+  }
+
+  // Fallback to memory cache
+  if (memoryCache.data && memoryCache.timestamp) {
+    return memoryCache;
+  }
+
+  return null;
+}
+
+async function setCache(data, timestamp) {
+  const store = await initBlobStore();
+
+  // Always update memory cache
+  memoryCache.data = data;
+  memoryCache.timestamp = timestamp;
+
+  // Try to update blob storage if available
+  if (store) {
+    try {
+      await store.set('weather-data', JSON.stringify({
+        data,
+        timestamp
+      }), {
+        metadata: {
+          fetched_at: new Date(timestamp).toISOString()
+        }
+      });
+      console.log('✅ Cached to Netlify Blobs');
+    } catch (error) {
+      console.log('⚠️  Blob cache write failed (using memory cache only):', error.message);
+    }
+  }
+}
 
 // WMO Weather interpretation codes
 const WMO_WEATHER_CODES = {
@@ -72,20 +144,27 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Check if we have valid cached data
+    // Check cache (Blobs or memory)
     const now = Date.now();
-    if (cache.data && cache.timestamp && (now - cache.timestamp < CACHE_DURATION)) {
-      console.log(`Returning cached data (age: ${Math.round((now - cache.timestamp) / 1000 / 60)} minutes)`);
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          data: cache.data,
-          cached: true,
-          cached_at: new Date(cache.timestamp).toISOString()
-        })
-      };
+    const cached = await getFromCache();
+
+    if (cached && cached.data && cached.timestamp) {
+      const cacheAge = now - cached.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        const cacheType = blobsAvailable ? 'Netlify Blobs' : 'memory';
+        console.log(`Returning cached data from ${cacheType} (age: ${Math.round(cacheAge / 1000 / 60)} minutes)`);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            data: cached.data,
+            cached: true,
+            cache_type: cacheType,
+            cached_at: new Date(cached.timestamp).toISOString()
+          })
+        };
+      }
     }
 
     // Build Open-Meteo API URL for forecast
@@ -243,11 +322,12 @@ exports.handler = async function(event, context) {
       hourly: allHourly
     };
 
-    // Update cache
-    cache.data = weatherData;
-    cache.timestamp = now;
+    // Save to cache (Blobs or memory)
+    await setCache(weatherData, now);
 
-    console.log('Fetched and cached fresh data from Open-Meteo');
+    const cacheType = blobsAvailable ? 'Netlify Blobs' : 'memory';
+    console.log(`Fetched and cached fresh data to ${cacheType}`);
+
     return {
       statusCode: 200,
       headers,
@@ -255,6 +335,7 @@ exports.handler = async function(event, context) {
         success: true,
         data: weatherData,
         cached: false,
+        cache_type: cacheType,
         fetched_at: new Date(now).toISOString()
       })
     };
