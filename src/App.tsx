@@ -1,109 +1,81 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, Wind, Droplets, ThermometerSun, Users, TrendingUp, RefreshCw } from 'lucide-react';
+import { Wind, Droplets, ThermometerSun, TrendingUp, RefreshCw } from 'lucide-react';
+import {
+  isOpen,
+  calculateCrowdFactor,
+  calculateCyclingScore,
+  calculateJoggingScore,
+  calculateKitingScore,
+  calculateSocializingScore,
+  type HourData
+} from './utils/scoring';
 
-// Opening hours configuration for Tempelhofer Feld
-// Supports different periods throughout the year
-const OPENING_HOURS_CONFIG = {
-  periods: [
-    {
-      name: 'Summer',
-      startMonth: 3,  // April (0-indexed)
-      endMonth: 8,    // September (0-indexed)
-      open: 6,        // 6:00 AM
-      close: 22       // 10:00 PM
-    },
-    {
-      name: 'Winter',
-      startMonth: 9,  // October (0-indexed)
-      endMonth: 2,    // March (0-indexed) - wraps around year
-      open: 7,        // 7:00 AM
-      close: 21       // 9:00 PM
-    }
-  ]
-};
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
-// Scoring configuration for each activity
-const SCORING_CONFIG = {
-  cycling: {
-    rain: { base: -40, probMultiplier: -20, threshold: 0.2, exponent: 1.5, maxPenalty: 25 },
-    wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
-    crowd: { multiplier: 0.25 },
-    cold: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
-    heat: { threshold: 24, maxPenalty: 30, range: 11, exponent: 1.3 },
-    airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 3, maxPenalty: 20, range: 6, exponent: 1.2 }
-  },
-  jogging: {
-    rain: { base: -25, probMultiplier: -12, threshold: 0.3, exponent: 1.5, maxPenalty: 18 },
-    wind: { threshold: 5, maxPenalty: 15, range: 8, exponent: 1.2 },
-    crowd: { multiplier: 0.1 },
-    cold: { threshold: 10, maxPenalty: 20, range: 10, exponent: 1.1 },
-    heat: { threshold: 22, maxPenalty: 35, range: 10, exponent: 1.4 },
-    airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 3, maxPenalty: 25, range: 7, exponent: 1.3 }
-  },
-  kiting: {
-    rain: { base: -30, probMultiplier: -15, threshold: 0.3, exponent: 1.5, maxPenalty: 20 },
-    wind: {
-      tooLightPenalty: -50, tooLightThreshold: 5,      // < 5 m/s: Too light
-      optimalMin: 7, optimalMax: 9,                     // 7-9 m/s: Sweet spot (no penalty)
-      workableMin: 5, workableMax: 11,                  // 5-11 m/s: Workable range (no penalty)
-      dangerousMin: 11, dangerousMax: 13, dangerousPenalty: -25,  // 11-13 m/s: Getting dangerous
-      veryDangerousPenalty: -50, veryDangerousThreshold: 13      // > 13 m/s: Very dangerous
-    },
-    crowd: { multiplier: 0.35 },
-    cold: { threshold: 10, maxPenalty: 40, range: 10, exponent: 1.4 },
-    heat: { threshold: 30, flatPenalty: -10 },
-    airQuality: { threshold: 2, maxPenalty: 15, range: 3, exponent: 1.3 },
-    uv: { threshold: 4, maxPenalty: 20, range: 6, exponent: 1.2 }
-  },
-  socializing: {
-    rain: { base: -60, probMultiplier: -20, threshold: 0.2, exponent: 1.6, maxPenalty: 35 },
-    wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
-    crowd: { multiplier: 0.25 },
-    cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
-    heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.2 },
-    airQuality: { threshold: 2, maxPenalty: 20, range: 3, exponent: 1.3 },
-    uv: { threshold: 3, maxPenalty: 30, range: 7, exponent: 1.3 }
-  }
-};
+export type Activity = 'cycling' | 'jogging' | 'kiting' | 'socializing';
 
-export default function TempelhoferBikeForecast() {
-  const [forecastData, setForecastData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [activity, setActivity] = useState('cycling');
-  const [usingMockData, setUsingMockData] = useState(false);
-  const [selectedHour, setSelectedHour] = useState(null);
+export interface WeatherData {
+  hourly: HourData[];
+}
+
+export interface HourDataWithScore extends HourData {
+  score: number;
+  isClosed: boolean;
+}
+
+export interface ScoreColor {
+  backgroundColor: string;
+  borderColor: string;
+  color: string;
+}
+
+export interface APIResponse {
+  success: boolean;
+  data?: WeatherData;
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export default function TempelhoferBikeForecast(): React.ReactElement {
+  const [forecastData, setForecastData] = useState<WeatherData | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [activity, setActivity] = useState<Activity>('cycling');
+  const [usingMockData, setUsingMockData] = useState<boolean>(false);
+  const [selectedHour, setSelectedHour] = useState<HourDataWithScore | null>(null);
 
   // Generate mock weather data
-  const generateMockWeatherData = () => {
+  const generateMockWeatherData = (): WeatherData => {
     const now = new Date();
     // Start from midnight of today to ensure full days are shown
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const hourly = [];
+    const hourly: HourData[] = [];
 
     for (let i = 0; i < 168; i++) { // 7 days
       const time = new Date(startOfToday.getTime() + i * 60 * 60 * 1000);
       const hour = time.getHours();
-      
+
       // Create realistic weather patterns (adjusted for current season)
       // November in Berlin: typically 2-8°C
       const baseTemp = 5 + Math.sin((i / 24) * Math.PI) * 3;
       const seasonalVariation = Math.sin((i / 168) * Math.PI) * 2;
       const temp = baseTemp + seasonalVariation + (Math.random() - 0.5) * 2;
-      
+
       // Wind patterns
       const windBase = hour < 6 || hour > 20 ? 2 : 5;
       const windSpeed = windBase + Math.random() * 4;
-      
+
       // Rain probability
       const rainDay = Math.floor(i / 24) % 7;
-      const rainBase = [0.1, 0.1, 0.6, 0.7, 0.2, 0.1, 0.3][rainDay];
+      const rainBase = [0.1, 0.1, 0.6, 0.7, 0.2, 0.1, 0.3][rainDay] ?? 0.1;
       const pop = Math.min(0.9, rainBase + (Math.random() - 0.5) * 0.2);
-      
+
       // Air Quality Index (1-5)
       // Worse in morning rush hour and evening, better at night
-      let aqi;
+      let aqi: number;
       if (hour >= 7 && hour <= 9) {
         aqi = Math.floor(Math.random() * 2) + 2; // 2-3 (Fair-Moderate)
       } else if (hour >= 17 && hour <= 19) {
@@ -113,12 +85,12 @@ export default function TempelhoferBikeForecast() {
       } else {
         aqi = Math.floor(Math.random() * 3) + 1; // 1-3 (Good-Moderate)
       }
-      
+
       // Weather conditions (must be defined before UV calculation)
       let weatherMain = 'Clear';
       let weatherDescription = 'clear sky';
       let hasThunderstorm = false;
-      
+
       if (pop > 0.5) {
         weatherMain = 'Rain';
         weatherDescription = pop > 0.7 ? 'moderate rain' : 'light rain';
@@ -135,7 +107,7 @@ export default function TempelhoferBikeForecast() {
         weatherMain = 'Clouds';
         weatherDescription = 'few clouds';
       }
-      
+
       // UV index (higher during midday, lower at night and in cloudy weather)
       let uvi = 0;
       if (hour >= 8 && hour <= 18) {
@@ -147,7 +119,7 @@ export default function TempelhoferBikeForecast() {
         if (weatherMain === 'Rain') uvi *= 0.3;
         uvi = Math.round(uvi * 10) / 10;
       }
-      
+
       hourly.push({
         dt: Math.floor(time.getTime() / 1000),
         temp: Math.round(temp * 10) / 10,
@@ -159,50 +131,11 @@ export default function TempelhoferBikeForecast() {
         hasThunderstorm: hasThunderstorm
       });
     }
-    
+
     return { hourly };
   };
 
-  const getOpeningHours = (date) => {
-    const month = date.getMonth();
-
-    // Find the matching period for this month
-    for (const period of OPENING_HOURS_CONFIG.periods) {
-      // Handle periods that wrap around the year (e.g., Oct-Mar)
-      if (period.startMonth <= period.endMonth) {
-        // Normal period (doesn't wrap around year)
-        if (month >= period.startMonth && month <= period.endMonth) {
-          return { open: period.open, close: period.close };
-        }
-      } else {
-        // Period wraps around year (e.g., startMonth=9, endMonth=2 means Oct-Mar)
-        if (month >= period.startMonth || month <= period.endMonth) {
-          return { open: period.open, close: period.close };
-        }
-      }
-    }
-
-    // Fallback (should not happen if config is complete)
-    return { open: 7, close: 21 };
-  };
-
-  const isOpen = (hour, date) => {
-    const hours = getOpeningHours(date);
-    return hour >= hours.open && hour < hours.close;
-  };
-
-  const calculateCrowdFactor = (hour, dayOfWeek, temp, weatherCondition) => {
-    let crowdScore = 0;
-    if (dayOfWeek === 0 || dayOfWeek === 6) crowdScore += 30;
-    if (hour >= 11 && hour <= 18) crowdScore += 25;
-    else if (hour >= 9 && hour < 11) crowdScore += 15;
-    else if (hour > 18 && hour <= 20) crowdScore += 15;
-    if (temp > 15 && temp < 25 && !weatherCondition.includes('rain')) crowdScore += 20;
-    if (weatherCondition.includes('rain') || temp < 5 || temp > 30) crowdScore -= 20;
-    return Math.max(0, Math.min(100, crowdScore));
-  };
-
-  const calculateBikeabilityScore = (hourData) => {
+  const calculateBikeabilityScore = (hourData: HourData): number => {
     if (activity === 'jogging') {
       return calculateJoggingScore(hourData);
     } else if (activity === 'kiting') {
@@ -213,304 +146,10 @@ export default function TempelhoferBikeForecast() {
     return calculateCyclingScore(hourData);
   };
 
-  const calculateCyclingScore = (hourData) => {
-    let score = 100;
-    const date = new Date(hourData.dt * 1000);
-    const hour = date.getHours();
-    const dayOfWeek = date.getDay();
-    const config = SCORING_CONFIG.cycling;
-
-    if (!isOpen(hour, date)) return 0;
-
-    // Thunderstorm penalty - CRITICAL (exposed area)
-    if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
-      return 0; // Absolutely not safe
-    }
-
-    // Rain penalty - prioritize probability with malus for actual rain
-    const pop = hourData.pop;
-    if (pop > config.rain.threshold) {
-      // Apply probability-based penalty
-      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    }
-    // Additional penalty if actually raining
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.probMultiplier;
-    }
-
-    // Wind penalty
-    const windSpeed = hourData.wind_speed;
-    if (windSpeed > config.wind.threshold) {
-      const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
-      score -= Math.min(config.wind.maxPenalty, windPenalty);
-    }
-
-    // Crowd penalty
-    const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    score -= (crowdFactor * config.crowd.multiplier);
-
-    // Temperature penalties
-    const temp = hourData.temp;
-
-    // Cold penalty
-    if (temp < config.cold.threshold) {
-      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-      score -= Math.min(config.cold.maxPenalty, coldPenalty);
-    }
-
-    // Heat penalty
-    if (temp > config.heat.threshold) {
-      const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
-      score -= Math.min(config.heat.maxPenalty, hotPenalty);
-    }
-
-    // Air Quality penalty
-    if (hourData.air_quality && hourData.air_quality.aqi) {
-      const aqi = hourData.air_quality.aqi;
-      if (aqi > config.airQuality.threshold) {
-        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-        score -= aqiPenalty;
-      }
-    }
-
-    // UV Index penalty
-    if (hourData.uvi !== undefined) {
-      const uvi = hourData.uvi;
-      if (uvi > config.uv.threshold) {
-        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-        score -= Math.min(config.uv.maxPenalty, uvPenalty);
-      }
-    }
-
-    return Math.max(0, Math.min(100, Math.round(score)));
-  };
-
-  const calculateJoggingScore = (hourData) => {
-    let score = 100;
-    const date = new Date(hourData.dt * 1000);
-    const hour = date.getHours();
-    const dayOfWeek = date.getDay();
-    const config = SCORING_CONFIG.jogging;
-
-    if (!isOpen(hour, date)) return 0;
-
-    // Thunderstorm penalty - CRITICAL (exposed area)
-    if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
-      return 0; // Absolutely not safe
-    }
-
-    // Rain penalty - prioritize probability with malus for actual rain
-    const pop = hourData.pop;
-    if (pop > config.rain.threshold) {
-      // Apply probability-based penalty
-      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    }
-    // Additional penalty if actually raining
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.probMultiplier;
-    }
-
-    // Wind penalty
-    const windSpeed = hourData.wind_speed;
-    if (windSpeed > config.wind.threshold) {
-      const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
-      score -= Math.min(config.wind.maxPenalty, windPenalty);
-    }
-
-    // Crowd penalty
-    const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    score -= (crowdFactor * config.crowd.multiplier);
-
-    // Temperature penalties
-    const temp = hourData.temp;
-
-    // Cold penalty
-    if (temp < config.cold.threshold) {
-      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-      score -= Math.min(config.cold.maxPenalty, coldPenalty);
-    }
-
-    // Heat penalty
-    if (temp > config.heat.threshold) {
-      const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
-      score -= Math.min(config.heat.maxPenalty, hotPenalty);
-    }
-
-    // Air Quality penalty
-    if (hourData.air_quality && hourData.air_quality.aqi) {
-      const aqi = hourData.air_quality.aqi;
-      if (aqi > config.airQuality.threshold) {
-        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-        score -= aqiPenalty;
-      }
-    }
-
-    // UV Index penalty
-    if (hourData.uvi !== undefined) {
-      const uvi = hourData.uvi;
-      if (uvi > config.uv.threshold) {
-        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-        score -= Math.min(config.uv.maxPenalty, uvPenalty);
-      }
-    }
-
-    return Math.max(0, Math.min(100, Math.round(score)));
-  };
-
-  const calculateKitingScore = (hourData) => {
-    let score = 100;
-    const date = new Date(hourData.dt * 1000);
-    const hour = date.getHours();
-    const dayOfWeek = date.getDay();
-    const config = SCORING_CONFIG.kiting;
-
-    if (!isOpen(hour, date)) return 0;
-
-    // Thunderstorm penalty - EXTREMELY CRITICAL for kiting (metal frame + lightning)
-    if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
-      return 0; // Deadly combination
-    }
-
-    // Wind - CRITICAL for kiting! Need wind but not too much
-    const windSpeed = hourData.wind_speed;
-    const w = config.wind;
-    if (windSpeed < w.tooLightThreshold) {
-      // < 5 m/s: Too light, insufficient power
-      score += w.tooLightPenalty;
-    } else if (windSpeed >= w.workableMin && windSpeed <= w.workableMax) {
-      // 5-11 m/s: Workable range (no penalty, this is good!)
-      // No adjustment needed - this is the ideal range
-    } else if (windSpeed > w.dangerousMin && windSpeed <= w.dangerousMax) {
-      // 11-13 m/s: Getting dangerous
-      score += w.dangerousPenalty;
-    } else if (windSpeed > w.veryDangerousThreshold) {
-      // > 13 m/s: Very dangerous
-      score += w.veryDangerousPenalty;
-    }
-
-    // Rain penalty - prioritize probability with malus for actual rain
-    const pop = hourData.pop;
-    if (pop > config.rain.threshold) {
-      // Apply probability-based penalty
-      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    }
-    // Additional penalty if actually raining
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.probMultiplier;
-    }
-
-    // Crowd penalty
-    const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    score -= (crowdFactor * config.crowd.multiplier);
-
-    // Temperature penalties
-    const temp = hourData.temp;
-
-    // Cold penalty
-    if (temp < config.cold.threshold) {
-      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-      score -= Math.min(config.cold.maxPenalty, coldPenalty);
-    } else if (temp > config.heat.threshold) {
-      score += config.heat.flatPenalty;
-    }
-
-    // Air Quality penalty
-    if (hourData.air_quality && hourData.air_quality.aqi) {
-      const aqi = hourData.air_quality.aqi;
-      if (aqi > config.airQuality.threshold) {
-        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-        score -= aqiPenalty;
-      }
-    }
-
-    // UV Index penalty
-    if (hourData.uvi !== undefined) {
-      const uvi = hourData.uvi;
-      if (uvi > config.uv.threshold) {
-        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-        score -= Math.min(config.uv.maxPenalty, uvPenalty);
-      }
-    }
-
-    return Math.max(0, Math.min(100, Math.round(score)));
-  };
-
-  const calculateSocializingScore = (hourData) => {
-    let score = 100;
-    const date = new Date(hourData.dt * 1000);
-    const hour = date.getHours();
-    const dayOfWeek = date.getDay();
-    const config = SCORING_CONFIG.socializing;
-
-    if (!isOpen(hour, date)) return 0;
-
-    // Thunderstorm penalty - ruins everything
-    if (hourData.hasThunderstorm || hourData.weather[0].main === 'Thunderstorm') {
-      return 0; // Pack up and go home
-    }
-
-    // Rain penalty - prioritize probability with malus for actual rain
-    const pop = hourData.pop;
-    if (pop > config.rain.threshold) {
-      // Apply probability-based penalty
-      score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    }
-    // Additional penalty if actually raining
-    if (hourData.weather[0].main.toLowerCase().includes('rain')) {
-      score += config.rain.probMultiplier;
-    }
-
-    // Wind penalty
-    const windSpeed = hourData.wind_speed;
-    if (windSpeed > config.wind.threshold) {
-      const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
-      score -= Math.min(config.wind.maxPenalty, windPenalty);
-    }
-
-    // Crowd penalty (mild for socializing - crowds less of an issue)
-    const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0].main);
-    score -= (crowdFactor * config.crowd.multiplier);
-
-    // Temperature penalties
-    const temp = hourData.temp;
-
-    // Cold penalty
-    if (temp < config.cold.threshold) {
-      const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-      score -= Math.min(config.cold.maxPenalty, coldPenalty);
-    }
-
-    // Heat penalty
-    if (temp > config.heat.threshold) {
-      const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
-      score -= Math.min(config.heat.maxPenalty, hotPenalty);
-    }
-
-    // Air Quality penalty
-    if (hourData.air_quality && hourData.air_quality.aqi) {
-      const aqi = hourData.air_quality.aqi;
-      if (aqi > config.airQuality.threshold) {
-        const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-        score -= aqiPenalty;
-      }
-    }
-
-    // UV Index penalty
-    if (hourData.uvi !== undefined) {
-      const uvi = hourData.uvi;
-      if (uvi > config.uv.threshold) {
-        const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-        score -= Math.min(config.uv.maxPenalty, uvPenalty);
-      }
-    }
-
-    return Math.max(0, Math.min(100, Math.round(score)));
-  };
-
-  const getScoreColor = (score) => {
+  const getScoreColor = (score: number): ScoreColor => {
     // Continuous gradient from green (100) → yellow (70) → red (0)
     // Using HSL for smooth color transitions
-    let hue, saturation, lightness;
+    let hue: number, saturation: number, lightness: number;
 
     if (score >= 70) {
       // Green to Yellow (100 → 70)
@@ -542,14 +181,14 @@ export default function TempelhoferBikeForecast() {
     };
   };
 
-  const getScoreLabel = (score, isClosed) => {
+  const getScoreLabel = (score: number, isClosed: boolean): string => {
     if (isClosed) return 'Closed';
     if (score >= 70) return 'Good';
     if (score >= 35) return 'Fair';
     return 'Poor';
   };
 
-  const loadForecast = async () => {
+  const loadForecast = async (): Promise<void> => {
     setLoading(true);
 
     try {
@@ -557,7 +196,7 @@ export default function TempelhoferBikeForecast() {
       const response = await fetch('/.netlify/functions/weather');
 
       if (response.ok) {
-        const result = await response.json();
+        const result: APIResponse = await response.json();
         if (result.success && result.data) {
           setForecastData(result.data);
           setUsingMockData(false);
@@ -566,7 +205,7 @@ export default function TempelhoferBikeForecast() {
         }
       }
     } catch (error) {
-      console.log('Failed to fetch real weather data, using mock data:', error.message);
+      console.log('Failed to fetch real weather data, using mock data:', (error as Error).message);
     }
 
     // Fallback to mock data if API fetch fails
@@ -581,8 +220,8 @@ export default function TempelhoferBikeForecast() {
     loadForecast();
   }, []);
 
-  const groupHoursByDay = (hours) => {
-    const days = {};
+  const groupHoursByDay = (hours: HourDataWithScore[]): Record<string, HourDataWithScore[]> => {
+    const days: Record<string, HourDataWithScore[]> = {};
     hours.forEach(hour => {
       const date = new Date(hour.dt * 1000);
       const dayKey = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -604,7 +243,7 @@ export default function TempelhoferBikeForecast() {
   }
 
   const hourlyData = forecastData.hourly;
-  const hoursWithScores = hourlyData.map(hour => {
+  const hoursWithScores: HourDataWithScore[] = hourlyData.map(hour => {
     const date = new Date(hour.dt * 1000);
     const hourOfDay = date.getHours();
     return {
@@ -613,9 +252,9 @@ export default function TempelhoferBikeForecast() {
       isClosed: !isOpen(hourOfDay, date)
     };
   });
-  
+
   const dayGroups = groupHoursByDay(hoursWithScores);
-  
+
   // Get top 3 times from next 4 days only (96 hours) - exclude past hours
   const now = new Date();
   const next4Days = hoursWithScores.slice(0, 96);
@@ -637,7 +276,7 @@ export default function TempelhoferBikeForecast() {
         >
           <div
             className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <div className="p-4">
               {/* Header */}
@@ -728,7 +367,7 @@ export default function TempelhoferBikeForecast() {
                     {Math.round(selectedHour.pop * 100)}%
                   </div>
                   <div className="text-xs text-gray-600 truncate">
-                    {selectedHour.weather[0].description}
+                    {selectedHour.weather[0]?.description}
                   </div>
                 </div>
               </div>
@@ -771,7 +410,7 @@ export default function TempelhoferBikeForecast() {
                       new Date(selectedHour.dt * 1000).getHours(),
                       new Date(selectedHour.dt * 1000).getDay(),
                       selectedHour.temp,
-                      selectedHour.weather[0].main
+                      selectedHour.weather[0]?.main || ''
                     ).toFixed(0)}%
                   </span>
                 </div>
@@ -805,7 +444,7 @@ export default function TempelhoferBikeForecast() {
               Refresh
             </button>
           </div>
-          
+
           {/* Activity Selector */}
           <div className="mt-6 bg-gray-100 p-1 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-1 max-w-2xl">
             <button
@@ -849,7 +488,7 @@ export default function TempelhoferBikeForecast() {
               Socializing
             </button>
           </div>
-          
+
           {usingMockData && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
@@ -897,7 +536,7 @@ export default function TempelhoferBikeForecast() {
                           {hour.score}
                         </div>
                       </div>
-                      
+
                       <div className="space-y-0.5 text-xs min-h-[64px] flex flex-col justify-center">
                         <div className="flex items-center justify-center gap-1">
                           <ThermometerSun className="w-3 h-3" />
@@ -927,20 +566,13 @@ export default function TempelhoferBikeForecast() {
             const midpoint = Math.ceil(hours.length / 2);
             const morningHours = hours.slice(0, midpoint);
             const afternoonHours = hours.slice(midpoint);
-            
-            const renderHourCard = (hour) => {
+
+            const renderHourCard = (hour: HourDataWithScore) => {
               const date = new Date(hour.dt * 1000);
               const now = new Date();
               const isPast = date < now;
               const isToday = date.toDateString() === now.toDateString();
               const showGreyedOut = isPast && isToday;
-              
-              const crowdFactor = calculateCrowdFactor(
-                date.getHours(),
-                date.getDay(),
-                hour.temp,
-                hour.weather[0].main
-              );
 
               const colors = hour.isClosed ? {
                 backgroundColor: 'rgb(229, 231, 235)',
@@ -969,7 +601,7 @@ export default function TempelhoferBikeForecast() {
                       {hour.isClosed ? '-' : hour.score}
                     </div>
                   </div>
-                  
+
                   <div className={`space-y-0.5 text-xs ${showGreyedOut ? 'text-gray-500' : ''}`}>
                     <div className="flex items-center justify-center gap-1">
                       <ThermometerSun className="w-3 h-3" />
@@ -991,13 +623,13 @@ export default function TempelhoferBikeForecast() {
             return (
               <div key={day} className="bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">{day}</h3>
-                
+
                 <div className="space-y-2">
                   {/* First row */}
                   <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
                     {morningHours.map(renderHourCard)}
                   </div>
-                  
+
                   {/* Second row */}
                   <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
                     {afternoonHours.map(renderHourCard)}

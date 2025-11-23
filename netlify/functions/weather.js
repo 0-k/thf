@@ -4,12 +4,7 @@
  */
 
 const fetch = require('node-fetch');
-
-// In-memory cache (simple solution for serverless)
-let cache = {
-  data: null,
-  timestamp: null
-};
+const { getStore } = require('@netlify/blobs');
 
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const TEMPELHOFER_LAT = 52.4732;
@@ -72,20 +67,28 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Check if we have valid cached data
+    // Initialize blob store
+    const store = getStore('weather-cache');
+
+    // Check if we have valid cached data in blob storage
     const now = Date.now();
-    if (cache.data && cache.timestamp && (now - cache.timestamp < CACHE_DURATION)) {
-      console.log('Returning cached data');
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          data: cache.data,
-          cached: true,
-          cached_at: new Date(cache.timestamp).toISOString()
-        })
-      };
+    const cachedBlob = await store.get('weather-data', { type: 'json' });
+
+    if (cachedBlob && cachedBlob.data && cachedBlob.timestamp) {
+      const cacheAge = now - cachedBlob.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        console.log(`Returning cached data from blob storage (age: ${Math.round(cacheAge / 1000 / 60)} minutes)`);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            data: cachedBlob.data,
+            cached: true,
+            cached_at: new Date(cachedBlob.timestamp).toISOString()
+          })
+        };
+      }
     }
 
     // Build Open-Meteo API URL for forecast
@@ -247,11 +250,17 @@ exports.handler = async function(event, context) {
       hourly: allHourly
     };
 
-    // Update cache
-    cache.data = weatherData;
-    cache.timestamp = now;
+    // Save to blob storage
+    await store.set('weather-data', JSON.stringify({
+      data: weatherData,
+      timestamp: now
+    }), {
+      metadata: {
+        fetched_at: new Date(now).toISOString()
+      }
+    });
 
-    console.log('Fetched and cached fresh data from Open-Meteo');
+    console.log('Fetched and cached fresh data to blob storage');
     return {
       statusCode: 200,
       headers,
