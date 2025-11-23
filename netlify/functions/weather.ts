@@ -344,20 +344,31 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       return hourly;
     };
 
-    // Get midnight of today
+    // Get midnight of today IN BERLIN TIME (UTC+1 in winter, UTC+2 in summer)
+    // The API returns data in Europe/Berlin timezone, so we need to align our midnight calculation
     const nowDate = new Date();
-    const midnightToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), 0, 0, 0);
-    const midnightTimestamp = Math.floor(midnightToday.getTime() / 1000);
+    const berlinOffset = 60; // Berlin is UTC+1 or UTC+2, we'll use the data to determine actual day boundary
+
+    // Get current timestamp
     const currentTimestamp = Math.floor(nowDate.getTime() / 1000);
 
     // Combine historical (past hours of today) + forecast
     let allHourly: HourlyData[] = [];
 
     if (historicalData) {
-      // Get ALL hours from midnight onwards (includes past hours of today)
+      // Get ALL hours from historical data
       const historicalHourly = convertHourlyData(historicalData);
+
+      // Find midnight of current day in Berlin time by looking at the data
+      // Get the date boundary: find the earliest hour that's today in Berlin time
+      const nowInBerlin = new Date(nowDate.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+      const midnightBerlin = new Date(nowInBerlin.getFullYear(), nowInBerlin.getMonth(), nowInBerlin.getDate(), 0, 0, 0);
+      // Convert back to UTC timestamp by adding Berlin offset
+      const berlinTimezoneOffset = nowDate.getTimezoneOffset() - nowInBerlin.getTimezoneOffset();
+      const midnightTimestamp = Math.floor((midnightBerlin.getTime() - berlinTimezoneOffset * 60 * 1000) / 1000);
+
       const todayHours = historicalHourly.filter(h => {
-        // Include from midnight up to (but not including) current hour
+        // Include from midnight (Berlin time) up to (but not including) current hour
         return h.dt >= midnightTimestamp && h.dt < currentTimestamp;
       });
       allHourly = todayHours;

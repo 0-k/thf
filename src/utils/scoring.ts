@@ -21,11 +21,10 @@ export interface OpeningHoursConfig {
 }
 
 export interface RainConfig {
-  base: number;
-  probMultiplier: number;
-  threshold: number;
-  exponent: number;
-  maxPenalty: number;
+  base: number;        // Penalty when actually raining (e.g., -40)
+  maxPenalty: number;  // Max penalty from rain probability (e.g., -20)
+  threshold: number;   // Min probability to start applying penalty (e.g., 0.2 = 20%)
+  exponent: number;    // How aggressively penalty scales with probability
 }
 
 export interface StandardWindConfig {
@@ -168,7 +167,7 @@ export const OPENING_HOURS_CONFIG: OpeningHoursConfig = {
 // Scoring configuration for each activity
 export const SCORING_CONFIG: ScoringConfig = {
   cycling: {
-    rain: { base: -40, probMultiplier: -20, threshold: 0.2, exponent: 1.5, maxPenalty: 25 },
+    rain: { base: -40, maxPenalty: 20, threshold: 0.2, exponent: 1.5 },
     wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
     crowd: { multiplier: 0.25 },
     cold: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
@@ -177,7 +176,7 @@ export const SCORING_CONFIG: ScoringConfig = {
     uv: { threshold: 3, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
   jogging: {
-    rain: { base: -25, probMultiplier: -12, threshold: 0.3, exponent: 1.5, maxPenalty: 18 },
+    rain: { base: -25, maxPenalty: 12, threshold: 0.3, exponent: 1.5 },
     wind: { threshold: 5, maxPenalty: 15, range: 8, exponent: 1.2 },
     crowd: { multiplier: 0.1 },
     cold: { threshold: 10, maxPenalty: 20, range: 10, exponent: 1.1 },
@@ -186,7 +185,7 @@ export const SCORING_CONFIG: ScoringConfig = {
     uv: { threshold: 3, maxPenalty: 25, range: 7, exponent: 1.3 }
   },
   kiting: {
-    rain: { base: -30, probMultiplier: -15, threshold: 0.3, exponent: 1.5, maxPenalty: 20 },
+    rain: { base: -30, maxPenalty: 15, threshold: 0.3, exponent: 1.5 },
     wind: {
       tooLightPenalty: -50, tooLightThreshold: 5,      // < 5 m/s: Too light
       optimalMin: 7, optimalMax: 9,                     // 7-9 m/s: Sweet spot (no penalty)
@@ -201,7 +200,7 @@ export const SCORING_CONFIG: ScoringConfig = {
     uv: { threshold: 4, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
   socializing: {
-    rain: { base: -60, probMultiplier: -20, threshold: 0.2, exponent: 1.6, maxPenalty: 35 },
+    rain: { base: -60, maxPenalty: 20, threshold: 0.2, exponent: 1.6 },
     wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
     crowd: { multiplier: 0.25 },
     cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
@@ -277,15 +276,19 @@ export const calculateCyclingScore = (hourData: HourData): number => {
     return 0; // Absolutely not safe
   }
 
-  // Rain penalty - prioritize probability with malus for actual rain
+  // Rain penalty - actual rain is worst, but high probability also penalized
   const pop = hourData.pop;
-  if (pop > config.rain.threshold) {
-    // Apply probability-based penalty
-    score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
+
+  // Base penalty if actually raining
+  if (isActuallyRaining) {
+    score += config.rain.base; // base is negative (e.g., -40)
   }
-  // Additional penalty if actually raining
-  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
-    score += config.rain.probMultiplier;
+
+  // Additional penalty based on rain probability
+  if (pop > config.rain.threshold) {
+    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    score -= probPenalty;
   }
 
   // Wind penalty
@@ -349,15 +352,19 @@ export const calculateJoggingScore = (hourData: HourData): number => {
     return 0; // Absolutely not safe
   }
 
-  // Rain penalty - prioritize probability with malus for actual rain
+  // Rain penalty - actual rain is worst, but high probability also penalized
   const pop = hourData.pop;
-  if (pop > config.rain.threshold) {
-    // Apply probability-based penalty
-    score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
+
+  // Base penalty if actually raining
+  if (isActuallyRaining) {
+    score += config.rain.base; // base is negative (e.g., -40)
   }
-  // Additional penalty if actually raining
-  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
-    score += config.rain.probMultiplier;
+
+  // Additional penalty based on rain probability
+  if (pop > config.rain.threshold) {
+    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    score -= probPenalty;
   }
 
   // Wind penalty
@@ -438,15 +445,19 @@ export const calculateKitingScore = (hourData: HourData): number => {
     score += w.veryDangerousPenalty;
   }
 
-  // Rain penalty - prioritize probability with malus for actual rain
+  // Rain penalty - actual rain is worst, but high probability also penalized
   const pop = hourData.pop;
-  if (pop > config.rain.threshold) {
-    // Apply probability-based penalty
-    score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
+
+  // Base penalty if actually raining
+  if (isActuallyRaining) {
+    score += config.rain.base; // base is negative (e.g., -40)
   }
-  // Additional penalty if actually raining
-  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
-    score += config.rain.probMultiplier;
+
+  // Additional penalty based on rain probability
+  if (pop > config.rain.threshold) {
+    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    score -= probPenalty;
   }
 
   // Crowd penalty
@@ -499,15 +510,19 @@ export const calculateSocializingScore = (hourData: HourData): number => {
     return 0; // Pack up and go home
   }
 
-  // Rain penalty - prioritize probability with malus for actual rain
+  // Rain penalty - actual rain is worst, but high probability also penalized
   const pop = hourData.pop;
-  if (pop > config.rain.threshold) {
-    // Apply probability-based penalty
-    score -= Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
+
+  // Base penalty if actually raining
+  if (isActuallyRaining) {
+    score += config.rain.base; // base is negative (e.g., -40)
   }
-  // Additional penalty if actually raining
-  if (hourData.weather[0]?.main.toLowerCase().includes('rain')) {
-    score += config.rain.probMultiplier;
+
+  // Additional penalty based on rain probability
+  if (pop > config.rain.threshold) {
+    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
+    score -= probPenalty;
   }
 
   // Wind penalty

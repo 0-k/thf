@@ -492,15 +492,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
           {usingMockData && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                <strong>Mock Data:</strong> Using simulated weather data. Deploy to see real forecasts from Open-Meteo.
-              </p>
-            </div>
-          )}
-
-          {!usingMockData && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">
-                <strong>Live Data:</strong> Real weather forecast from Open-Meteo (DWD ICON model, free).
+                <strong>Mock Data:</strong> Using simulated weather data. Deploy to see real forecasts.
               </p>
             </div>
           )}
@@ -781,8 +773,13 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
               <div className="p-4 bg-blue-50 rounded-lg">
                 <h4 className="font-semibold text-blue-900 mb-2">Scoring System</h4>
                 <p className="text-sm text-blue-800">
-                  All activities start at <strong>100 points</strong>. Only penalties apply - no bonuses. The score reflects how many conditions are working against your activity.
+                  All activities start at <strong>100 points</strong>. The score reflects how many conditions are working against your activity.
                 </p>
+                {!usingMockData && (
+                  <p className="text-xs text-blue-700 mt-2">
+                    Weather data from <strong>Open-Meteo</strong> (DWD ICON model, free service)
+                  </p>
+                )}
               </div>
             </div>
           </div>
