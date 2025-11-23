@@ -101,11 +101,46 @@ npm run test:ui
 
 ## Deployment
 
-### To Netlify
+### Production (master branch)
 
 1. Push to GitHub
 2. Netlify auto-deploys from master
 3. Functions deployed automatically
+4. Live at: your-site.netlify.app
+
+### Staging/Preview Deployments
+
+**Option 1: Pull Request Previews (Automatic)**
+
+Create a PR and Netlify automatically deploys a preview:
+- URL: `deploy-preview-X--your-site.netlify.app`
+- Full Netlify environment (Functions + Blobs)
+- Perfect for testing before merge
+
+**Option 2: Branch Deploys (For Development Testing)**
+
+For branches named `claude/dev_*`:
+
+1. **First time setup** - Configure in Netlify UI:
+   - Go to: Site settings → Build & deploy → Continuous deployment → Branch deploys
+   - Select: "Let me add individual branches"
+   - Add pattern: `claude/dev_*`
+
+2. **Create dev branch:**
+   ```bash
+   git checkout -b claude/dev_feature-name
+   git push -u origin claude/dev_feature-name
+   ```
+
+3. **Netlify auto-deploys to:**
+   - URL: `claude-dev-feature-name--your-site.netlify.app`
+   - Full environment with real Functions and Blobs
+   - Updates on every push
+
+**Branch naming convention:**
+- `claude/dev_*` → Auto-deploys to staging (e.g., `claude/dev_blobs-test`)
+- `claude/*` (other) → No auto-deploy (manual testing only)
+- PRs from any branch → Always get deploy preview
 
 **Netlify Blobs Setup (Optional but Recommended):**
 

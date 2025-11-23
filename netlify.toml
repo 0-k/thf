@@ -3,11 +3,14 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# Deploy previews for all branches (enables testing before merging)
+# Deploy previews for pull requests (enables testing before merging)
 [context.deploy-preview]
   command = "npm run build"
 
-# Branch deploys for claude/* branches (staging environment)
+# Branch deploys for claude/dev_* branches (staging environment)
+# Note: The branch pattern must be configured in Netlify UI under:
+# Site settings → Build & deploy → Continuous deployment → Branch deploys
+# Set pattern to: claude/dev_*
 [context.branch-deploy]
   command = "npm run build"
 
