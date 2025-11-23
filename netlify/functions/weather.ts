@@ -1,12 +1,79 @@
 /**
  * Netlify Function: Weather API
  * Fetches weather data from Open-Meteo (free, no API key needed)
+ *
+ * Caching strategy:
+ * - Tries Netlify Blobs (persistent, shared across instances) if available
+ * - Falls back to in-memory cache if Blobs not configured
  */
 
-const fetch = require('node-fetch');
+import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
+import fetch from 'node-fetch';
 
-// In-memory cache (simple solution for serverless)
-let cache = {
+// Type definitions
+interface WeatherCache {
+  data: WeatherData | null;
+  timestamp: number | null;
+}
+
+interface WeatherData {
+  lat: number;
+  lon: number;
+  timezone: string;
+  timezone_offset: number;
+  current: {
+    dt: number;
+    temp: number;
+    weather: Array<{ main: string; description: string }>;
+  };
+  hourly: HourlyData[];
+}
+
+interface HourlyData {
+  dt: number;
+  temp: number;
+  feels_like: number;
+  pressure: number;
+  humidity: number;
+  dew_point: number;
+  uvi: number;
+  clouds: number;
+  visibility: number;
+  wind_speed: number;
+  wind_deg: number;
+  wind_gust: number;
+  weather: Array<{ main: string; description: string }>;
+  pop: number;
+  rain?: { '1h': number };
+  air_quality: { aqi: number };
+  hasThunderstorm: boolean;
+}
+
+interface OpenMeteoResponse {
+  hourly: {
+    time: string[];
+    temperature_2m: number[];
+    apparent_temperature: number[];
+    precipitation_probability: number[];
+    precipitation: number[];
+    weather_code: number[];
+    cloud_cover: number[];
+    visibility: number[];
+    wind_speed_10m: number[];
+    wind_direction_10m: number[];
+    wind_gusts_10m: number[];
+    uv_index: number[];
+    is_day: number[];
+  };
+}
+
+interface CachedData {
+  data: WeatherData;
+  timestamp: number;
+}
+
+// In-memory cache fallback
+const memoryCache: WeatherCache = {
   data: null,
   timestamp: null
 };
@@ -15,8 +82,82 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const TEMPELHOFER_LAT = 52.4732;
 const TEMPELHOFER_LON = 13.4053;
 
+// Lazy-load Netlify Blobs (only if available)
+let blobStore: any = null;
+let blobsAvailable: boolean | null = null;
+
+async function initBlobStore(): Promise<any> {
+  if (blobsAvailable === false) return null;
+  if (blobStore) return blobStore;
+
+  try {
+    const { getStore } = await import('@netlify/blobs');
+    blobStore = getStore('weather-cache');
+    blobsAvailable = true;
+    console.log('✅ Netlify Blobs initialized successfully');
+    return blobStore;
+  } catch (error) {
+    blobsAvailable = false;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log('⚠️  Netlify Blobs not available, using in-memory cache:', errorMessage);
+    return null;
+  }
+}
+
+async function getFromCache(): Promise<CachedData | null> {
+  const store = await initBlobStore();
+
+  if (store) {
+    try {
+      const cachedBlob = await store.get('weather-data', { type: 'json' });
+      if (cachedBlob && cachedBlob.data && cachedBlob.timestamp) {
+        return cachedBlob as CachedData;
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log('Blob cache read failed, falling back to memory:', errorMessage);
+    }
+  }
+
+  // Fallback to memory cache
+  if (memoryCache.data && memoryCache.timestamp) {
+    return {
+      data: memoryCache.data,
+      timestamp: memoryCache.timestamp
+    };
+  }
+
+  return null;
+}
+
+async function setCache(data: WeatherData, timestamp: number): Promise<void> {
+  const store = await initBlobStore();
+
+  // Always update memory cache
+  memoryCache.data = data;
+  memoryCache.timestamp = timestamp;
+
+  // Try to update blob storage if available
+  if (store) {
+    try {
+      await store.set('weather-data', JSON.stringify({
+        data,
+        timestamp
+      }), {
+        metadata: {
+          fetched_at: new Date(timestamp).toISOString()
+        }
+      });
+      console.log('✅ Cached to Netlify Blobs');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log('⚠️  Blob cache write failed (using memory cache only):', errorMessage);
+    }
+  }
+}
+
 // WMO Weather interpretation codes
-const WMO_WEATHER_CODES = {
+const WMO_WEATHER_CODES: Record<number, { main: string; description: string }> = {
   0: { main: 'Clear', description: 'clear sky' },
   1: { main: 'Clear', description: 'mainly clear' },
   2: { main: 'Clouds', description: 'partly cloudy' },
@@ -40,11 +181,11 @@ const WMO_WEATHER_CODES = {
   99: { main: 'Thunderstorm', description: 'thunderstorm with heavy hail' }
 };
 
-function mapWeatherCode(code) {
+function mapWeatherCode(code: number): { main: string; description: string } {
   return WMO_WEATHER_CODES[code] || { main: 'Unknown', description: 'unknown' };
 }
 
-exports.handler = async function(event, context) {
+export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -72,26 +213,33 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Check if we have valid cached data
+    // Check cache (Blobs or memory)
     const now = Date.now();
-    if (cache.data && cache.timestamp && (now - cache.timestamp < CACHE_DURATION)) {
-      console.log(`Returning cached data (age: ${Math.round((now - cache.timestamp) / 1000 / 60)} minutes)`);
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          data: cache.data,
-          cached: true,
-          cached_at: new Date(cache.timestamp).toISOString()
-        })
-      };
+    const cached = await getFromCache();
+
+    if (cached && cached.data && cached.timestamp) {
+      const cacheAge = now - cached.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        const cacheType = blobsAvailable ? 'Netlify Blobs' : 'memory';
+        console.log(`Returning cached data from ${cacheType} (age: ${Math.round(cacheAge / 1000 / 60)} minutes)`);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            data: cached.data,
+            cached: true,
+            cache_type: cacheType,
+            cached_at: new Date(cached.timestamp).toISOString()
+          })
+        };
+      }
     }
 
     // Build Open-Meteo API URL for forecast
     const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast');
-    forecastUrl.searchParams.set('latitude', TEMPELHOFER_LAT);
-    forecastUrl.searchParams.set('longitude', TEMPELHOFER_LON);
+    forecastUrl.searchParams.set('latitude', TEMPELHOFER_LAT.toString());
+    forecastUrl.searchParams.set('longitude', TEMPELHOFER_LON.toString());
     forecastUrl.searchParams.set('hourly', [
       'temperature_2m',
       'apparent_temperature',
@@ -112,8 +260,8 @@ exports.handler = async function(event, context) {
 
     // Fetch past 24 hours for today's historical data
     const historicalUrl = new URL('https://api.open-meteo.com/v1/forecast');
-    historicalUrl.searchParams.set('latitude', TEMPELHOFER_LAT);
-    historicalUrl.searchParams.set('longitude', TEMPELHOFER_LON);
+    historicalUrl.searchParams.set('latitude', TEMPELHOFER_LAT.toString());
+    historicalUrl.searchParams.set('longitude', TEMPELHOFER_LON.toString());
     historicalUrl.searchParams.set('hourly', [
       'temperature_2m',
       'apparent_temperature',
@@ -160,12 +308,12 @@ exports.handler = async function(event, context) {
       // Non-fatal, we can continue without past hours
     }
 
-    const forecastData = await forecastResponse.json();
-    const historicalData = historicalResponse.ok ? await historicalResponse.json() : null;
+    const forecastData = await forecastResponse.json() as OpenMeteoResponse;
+    const historicalData = historicalResponse.ok ? await historicalResponse.json() as OpenMeteoResponse : null;
 
     // Convert Open-Meteo hourly data to our format
-    const convertHourlyData = (data, startIndex = 0) => {
-      const hourly = [];
+    const convertHourlyData = (data: OpenMeteoResponse, startIndex = 0): HourlyData[] => {
+      const hourly: HourlyData[] = [];
       const times = data.hourly.time;
 
       for (let i = startIndex; i < times.length; i++) {
@@ -196,20 +344,31 @@ exports.handler = async function(event, context) {
       return hourly;
     };
 
-    // Get midnight of today
+    // Get midnight of today IN BERLIN TIME (UTC+1 in winter, UTC+2 in summer)
+    // The API returns data in Europe/Berlin timezone, so we need to align our midnight calculation
     const nowDate = new Date();
-    const midnightToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), 0, 0, 0);
-    const midnightTimestamp = Math.floor(midnightToday.getTime() / 1000);
+    const berlinOffset = 60; // Berlin is UTC+1 or UTC+2, we'll use the data to determine actual day boundary
+
+    // Get current timestamp
     const currentTimestamp = Math.floor(nowDate.getTime() / 1000);
 
     // Combine historical (past hours of today) + forecast
-    let allHourly = [];
+    let allHourly: HourlyData[] = [];
 
     if (historicalData) {
-      // Get ALL hours from midnight onwards (includes past hours of today)
+      // Get ALL hours from historical data
       const historicalHourly = convertHourlyData(historicalData);
+
+      // Find midnight of current day in Berlin time by looking at the data
+      // Get the date boundary: find the earliest hour that's today in Berlin time
+      const nowInBerlin = new Date(nowDate.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+      const midnightBerlin = new Date(nowInBerlin.getFullYear(), nowInBerlin.getMonth(), nowInBerlin.getDate(), 0, 0, 0);
+      // Convert back to UTC timestamp by adding Berlin offset
+      const berlinTimezoneOffset = nowDate.getTimezoneOffset() - nowInBerlin.getTimezoneOffset();
+      const midnightTimestamp = Math.floor((midnightBerlin.getTime() - berlinTimezoneOffset * 60 * 1000) / 1000);
+
       const todayHours = historicalHourly.filter(h => {
-        // Include from midnight up to (but not including) current hour
+        // Include from midnight (Berlin time) up to (but not including) current hour
         return h.dt >= midnightTimestamp && h.dt < currentTimestamp;
       });
       allHourly = todayHours;
@@ -220,7 +379,7 @@ exports.handler = async function(event, context) {
     allHourly = [...allHourly, ...forecastHourly];
 
     // Remove duplicates (in case of overlap)
-    const seen = new Set();
+    const seen = new Set<number>();
     allHourly = allHourly.filter(h => {
       if (seen.has(h.dt)) return false;
       seen.add(h.dt);
@@ -230,7 +389,7 @@ exports.handler = async function(event, context) {
     // Sort by timestamp
     allHourly.sort((a, b) => a.dt - b.dt);
 
-    const weatherData = {
+    const weatherData: WeatherData = {
       lat: TEMPELHOFER_LAT,
       lon: TEMPELHOFER_LON,
       timezone: 'Europe/Berlin',
@@ -243,11 +402,12 @@ exports.handler = async function(event, context) {
       hourly: allHourly
     };
 
-    // Update cache
-    cache.data = weatherData;
-    cache.timestamp = now;
+    // Save to cache (Blobs or memory)
+    await setCache(weatherData, now);
 
-    console.log('Fetched and cached fresh data from Open-Meteo');
+    const cacheType = blobsAvailable ? 'Netlify Blobs' : 'memory';
+    console.log(`Fetched and cached fresh data to ${cacheType}`);
+
     return {
       statusCode: 200,
       headers,
@@ -255,18 +415,20 @@ exports.handler = async function(event, context) {
         success: true,
         data: weatherData,
         cached: false,
+        cache_type: cacheType,
         fetched_at: new Date(now).toISOString()
       })
     };
 
   } catch (error) {
-    console.error('Error in weather function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error in weather function:', errorMessage);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         success: false,
-        error: error.message
+        error: errorMessage
       })
     };
   }

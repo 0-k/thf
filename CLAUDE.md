@@ -4,8 +4,8 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 
 ## Project Status
 
-**Current State:** Production with Open-Meteo API + Netlify Functions + Netlify Blobs + Scheduled Updates
-**Next Steps:** Testing Infrastructure (Phase 2) → TypeScript Migration (Phase 3)
+**Current State:** Production-ready with 100% TypeScript + Open-Meteo API + Netlify Functions + Smart Caching
+**All Phases Complete:** ✅ Data Infrastructure | ✅ Testing Infrastructure | ✅ TypeScript Migration
 
 ## Tech Stack
 
@@ -17,10 +17,10 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 ## Key Files
 
 - `src/App.tsx` - Main React app with 4 activities (TypeScript, fully typed)
+- `src/main.tsx` - React entry point (TypeScript)
 - `src/utils/scoring.ts` - Scoring logic and configuration (TypeScript, fully typed)
 - `src/utils/scoring.test.ts` - Comprehensive unit tests (63 tests, TypeScript)
-- `netlify/functions/weather.js` - Serverless API endpoint for weather data
-- `netlify/functions/scheduled-weather-update.js` - Scheduled function (runs hourly) to update weather cache
+- `netlify/functions/weather.ts` - Serverless API endpoint for weather data (TypeScript)
 - `vitest.config.js` - Vitest testing configuration
 - `tsconfig.json` - TypeScript configuration (strict mode)
 - `tsconfig.node.json` - TypeScript configuration for build tools
@@ -40,12 +40,15 @@ Four activity-specific scoring functions:
 - `calculatePicnicScore()` - Rain -60, Wind -40, Cold -35 (15°C), UV -30
 
 ### Data Flow
-1. Scheduled function fetches weather data every hour and stores in Netlify Blobs (persistent cache)
-2. Frontend requests weather data from Netlify Function
-3. Function serves from Netlify Blobs (fast, persistent across function instances)
-4. If cache is stale (>1 hour), function fetches fresh data from Open-Meteo API
-5. Past hours backfilled using Open-Meteo historical API
-6. Frontend applies scoring algorithms client-side
+1. Frontend requests weather data from Netlify Function (`/.netlify/functions/weather`)
+2. Function checks cache (tries Netlify Blobs first, falls back to in-memory)
+3. If cached and fresh (<1 hour old): Return cached data immediately
+4. If stale or missing: Fetch fresh data from Open-Meteo API
+   - Fetch forecast (7 days ahead)
+   - Fetch historical data (past 24 hours) for today's earlier hours
+   - Combine and deduplicate
+5. Cache the fresh data (Blobs if available, otherwise in-memory)
+6. Frontend applies scoring algorithms client-side using `src/utils/scoring.ts`
 
 ### Layout
 - 2-row grid per day (2x12 on desktop, 2x6 on mobile)
@@ -57,22 +60,25 @@ Four activity-specific scoring functions:
 ## Roadmap: Professional Robustness
 
 ### Phase 1: Data Infrastructure (COMPLETED ✅)
-**Goal:** Reliable, high-quality weather data with proper persistence
+**Goal:** Reliable, high-quality weather data with smart caching
 
 ✅ **Completed:**
-- Switch to Open-Meteo API (free, unlimited, hourly forecasts up to 16 days)
-- No API key management needed
+- Switch to Open-Meteo API (free, no key required, hourly forecasts up to 16 days)
+- No API key management needed (100% free)
 - True hourly data (not 3-hour intervals)
-- Implement Netlify Blobs for persistent caching across function instances
-- Add scheduled function (cron) to fetch weather every hour in background
-- Use Open-Meteo historical API for proper past hours (no interpolation)
-- Store 7 days of forecast data persistently in Netlify Blobs
+- **Smart hybrid caching**: Tries Netlify Blobs, falls back to in-memory
+  - Blobs: Persistent, shared across function instances (when available)
+  - Memory: Works everywhere, automatic fallback
+- Use Open-Meteo historical API for proper past hours (including 0:00)
+- Fixed timezone handling (Berlin time vs UTC)
+- Store 7 days of forecast data with 1-hour cache TTL
 
 **Benefits Achieved:**
-- Eliminates cold starts and inconsistent caching ✅
-- Always-fast responses (served from blob storage) ✅
-- More reliable than in-memory cache per function instance ✅
-- Reduces API calls to 24/day (scheduled fetches only) ✅
+- Works in all environments (dev, staging, prod) ✅
+- No configuration required ✅
+- Graceful degradation when Blobs unavailable ✅
+- Fast responses when cached (<100ms) ✅
+- Reduces API calls (24-500/day depending on traffic and Blobs availability) ✅
 
 ### Phase 2: Testing Infrastructure (COMPLETED ✅)
 **Goal:** Prevent regressions, ensure scoring accuracy
@@ -120,12 +126,37 @@ Four activity-specific scoring functions:
 - Zero TypeScript errors ✅
 
 **Benefits Achieved:**
-- Compile-time error checking for entire frontend ✅
+- Compile-time error checking for entire frontend AND backend ✅
 - Full IDE autocomplete and IntelliSense everywhere ✅
 - Self-documenting code (types as inline documentation) ✅
 - Safer refactoring with type guarantees ✅
 - Prevents common bugs (undefined/null, type mismatches) ✅
 - 31.8% code reduction by eliminating duplicates ✅
+- **100% TypeScript coverage** (no .js/.jsx files remaining) ✅
+
+### Recent Improvements & Bug Fixes
+
+**Timezone Bug Fixed (2025-11-23):**
+- Fixed missing 0:00 hour due to UTC vs Berlin timezone mismatch
+- Now properly converts between timezones using `toLocaleString`
+- All hours from midnight (Berlin time) onwards now included
+
+**Rain Penalty Logic Fixed:**
+- Actually raining: Base penalty (e.g., -40 for cycling)
+- Rain probability: Scaled penalty up to maxPenalty (e.g., -20)
+- Total max: base + maxPenalty (e.g., -60 total)
+- Clarified that actual rain is worse than probability
+
+**UI Improvements:**
+- Removed "Live Data" green box (cleaner UI)
+- Added weather data source to bottom explainer (Open-Meteo credit)
+- Simplified scoring explanation text
+
+**Code Cleanup:**
+- Removed 2,706 lines of obsolete code from initial setup
+- Deleted old backend/, tmp/ directories
+- Removed outdated documentation (QUICKSTART.md, DEPLOYMENT.md, .env.example)
+- All docs now up-to-date (README.md, CLAUDE.md, DEV_README.md)
 
 ## Coding Conventions
 
