@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  OPENING_HOURS_CONFIG,
   SCORING_CONFIG,
   getOpeningHours,
   isOpen,
@@ -9,7 +8,6 @@ import {
   calculateJoggingScore,
   calculateKitingScore,
   calculateSocializingScore,
-  type HourData,
 } from './scoring';
 
 describe('Opening Hours Logic', () => {
@@ -370,12 +368,6 @@ describe('Kiting Score', () => {
   });
 
   it('should have highest crowd penalty multiplier', () => {
-    // Weekend afternoon with good weather - high crowd
-    const kitingData = createMockHourData({
-      dt: new Date(2024, 5, 15, 14, 0).getTime() / 1000, // Saturday
-      temp: 20,
-    });
-
     // Verify kiting has highest crowd multiplier in config
     expect(SCORING_CONFIG.kiting.crowd.multiplier).toBeGreaterThan(SCORING_CONFIG.cycling.crowd.multiplier);
     expect(SCORING_CONFIG.kiting.crowd.multiplier).toBeGreaterThan(SCORING_CONFIG.jogging.crowd.multiplier);
