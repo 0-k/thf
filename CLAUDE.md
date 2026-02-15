@@ -19,7 +19,7 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 - `src/App.tsx` - Main React app with 4 activities (TypeScript, fully typed)
 - `src/main.tsx` - React entry point (TypeScript)
 - `src/utils/scoring.ts` - Scoring logic and configuration (TypeScript, fully typed)
-- `src/utils/scoring.test.ts` - Comprehensive unit tests (63 tests, TypeScript)
+- `src/utils/scoring.test.ts` - Comprehensive unit tests (77 tests, TypeScript)
 - `netlify/functions/weather.ts` - Serverless API endpoint for weather data (TypeScript)
 - `vitest.config.js` - Vitest testing configuration
 - `tsconfig.json` - TypeScript configuration (strict mode)
@@ -34,10 +34,10 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 All activities start at 100 points. Only penalties reduce score (no bonuses).
 
 Four activity-specific scoring functions:
-- `calculateCyclingScore()` - Wind -40, Rain -40, Cold -40 (12°C), Crowds -25
-- `calculateJoggingScore()` - Heat -35 (22°C), Rain -25, Cold -20 (10°C), UV -25
-- `calculateKitingScore()` - Wind critical (5-11 m/s ideal), Cold -40 (10°C), Rain -30
-- `calculatePicnicScore()` - Rain -60, Wind -40, Cold -35 (15°C), UV -30
+- `calculateCyclingScore()` - Wind -40, Rain -55 (continuous by probability + intensity), Cold -40 (12°C), Crowds -25
+- `calculateJoggingScore()` - Heat -35 (22°C), Rain -32 (continuous), Cold -20 (10°C), UV -25
+- `calculateKitingScore()` - Wind critical (5-11 m/s ideal), Cold -40 (10°C), Rain -40 (continuous)
+- `calculateSocializingScore()` - Rain -70 (continuous), Wind -40, Cold -35 (15°C), UV -30
 
 ### Data Flow
 1. Frontend requests weather data from Netlify Function (`/.netlify/functions/weather`)
@@ -121,7 +121,7 @@ Four activity-specific scoring functions:
   - All state typed with useState<Type>
   - All event handlers typed
   - All function signatures with explicit return types
-- All 63 tests passing with TypeScript ✅
+- All 77 tests passing with TypeScript ✅
 - Build process working perfectly ✅
 - Zero TypeScript errors ✅
 
@@ -141,11 +141,12 @@ Four activity-specific scoring functions:
 - Now properly converts between timezones using `toLocaleString`
 - All hours from midnight (Berlin time) onwards now included
 
-**Rain Penalty Logic Fixed:**
-- Actually raining: Base penalty (e.g., -40 for cycling)
-- Rain probability: Scaled penalty up to maxPenalty (e.g., -20)
-- Total max: base + maxPenalty (e.g., -60 total)
-- Clarified that actual rain is worse than probability
+**Rain Penalty Logic - Fully Continuous:**
+- Every % of precipitation probability contributes to penalty (no threshold, no binary check)
+- Formula: `pop^exponent * maxPenalty` (smooth power curve from 0% to 100%)
+- Additional intensity penalty when actual precipitation amount > 0 (mm/h)
+- Examples (cycling): 10% pop = -3, 50% pop = -23, 80% pop = -42, 100% pop = -55
+- No more binary "is it raining" flip switch
 
 **UI Improvements:**
 - Removed "Live Data" green box (cleaner UI)
@@ -208,7 +209,7 @@ Four activity-specific scoring functions:
 ## Important Context
 
 - **Location:** Tempelhofer Feld, Berlin (52.4732°N, 13.4053°E)
-- **Opening hours:** Summer (Apr-Sep) 6:00-22:00, Winter (Oct-Mar) 7:00-21:00
+- **Opening hours:** Monthly schedule (Jan 8-17, Jun/Jul 6-23, Dec 8-17) - real Tempelhofer Feld hours from tempelhoferfeld.de
 - **Closed hours:** Automatic score of 0, displayed as "-"
 - **Mobile-first:** Cards optimized for 6-column mobile grid
 - **Time display:** 10px font to prevent overflow on mobile
@@ -226,17 +227,18 @@ Four activity-specific scoring functions:
 - Cycling/Picnic: wind is penalty (affects comfort, stability)
 - Jogging: minimal wind penalty (lower profile)
 
-**Rain tolerance:**
-- Picnic: worst (-60 base penalty, ruins everything)
-- Cycling: severe (-40 base penalty)
-- Kiting: moderate (-30 base penalty)
-- Jogging: lightest (-25 base penalty, runners don't mind)
+**Rain sensitivity (fully continuous, no binary switch):**
+- Socializing: worst (maxPenalty -70, steepest curve, ruins food/blankets)
+- Cycling: severe (maxPenalty -55, wet roads, poor visibility)
+- Kiting: moderate (maxPenalty -40, wet equipment)
+- Jogging: lightest (maxPenalty -32, runners tolerate rain)
 
-**Crowd impact:**
-- Kiting: highest penalty (safety, need space)
-- Cycling: moderate penalty (navigation)
-- Picnic: light penalty (less of an issue)
-- Jogging: minimal penalty (easy to navigate)
+**Crowd estimation:**
+- Multi-factor model: day of week (+30 weekend), time of day (+25 peak), season (+5 to +25), temperature bell curve (~22°C ideal, +15), rain probability (-25 at 100%), cloud cover (+10 sunny)
+- Kiting: highest penalty multiplier (0.35, safety/space)
+- Cycling: moderate multiplier (0.25, navigation)
+- Socializing: moderate multiplier (0.25, less of an issue)
+- Jogging: minimal multiplier (0.10, easy to navigate)
 
 ## Data Source: Open-Meteo API
 
@@ -264,5 +266,5 @@ https://api.open-meteo.com/v1/forecast
 - The continuous penalty formulas (tuned through trial)
 - The 2-row grid layout (tested on mobile)
 - Time font size (10px prevents overflow)
-- Opening hours logic (Tempelhofer Feld specific)
+- Monthly opening hours table (real Tempelhofer Feld hours from official website)
 - Penalty-only scoring system (no bonuses)

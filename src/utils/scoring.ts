@@ -8,23 +8,16 @@
 // Type Definitions
 // ============================================================================
 
-export interface OpeningHoursPeriod {
-  name: string;
-  startMonth: number;
-  endMonth: number;
-  open: number;
-  close: number;
-}
-
-export interface OpeningHoursConfig {
-  periods: OpeningHoursPeriod[];
+export interface MonthlyOpeningHours {
+  /** Monthly opening hours, index 0 = January, 11 = December */
+  months: OpeningHours[];
 }
 
 export interface RainConfig {
-  base: number;        // Penalty when actually raining (e.g., -40)
-  maxPenalty: number;  // Max penalty from rain probability (e.g., -20)
-  threshold: number;   // Min probability to start applying penalty (e.g., 0.2 = 20%)
-  exponent: number;    // How aggressively penalty scales with probability
+  maxPenalty: number;     // Total max penalty at 100% probability (e.g., 55)
+  exponent: number;       // How aggressively penalty scales with probability (>1 = steeper at high end)
+  intensityMax: number;   // Additional max penalty from actual precipitation intensity
+  intensityScale: number; // Precipitation mm/h at which intensity penalty is maxed out
 }
 
 export interface StandardWindConfig {
@@ -143,31 +136,33 @@ export interface OpeningHours {
 // Configuration
 // ============================================================================
 
-// Opening hours configuration for Tempelhofer Feld
-// Supports different periods throughout the year
-export const OPENING_HOURS_CONFIG: OpeningHoursConfig = {
-  periods: [
-    {
-      name: 'Summer',
-      startMonth: 3,  // April (0-indexed)
-      endMonth: 8,    // September (0-indexed)
-      open: 6,        // 6:00 AM
-      close: 22       // 10:00 PM
-    },
-    {
-      name: 'Winter',
-      startMonth: 9,  // October (0-indexed)
-      endMonth: 2,    // March (0-indexed) - wraps around year
-      open: 7,        // 7:00 AM
-      close: 21       // 9:00 PM
-    }
+// Real monthly opening hours for Tempelhofer Feld (source: tempelhoferfeld.de)
+// Hours follow sunrise/sunset and change monthly
+// Open values rounded up and close values rounded up to nearest full hour
+// (since we score hourly, an hour is "open" if the field is open for most of it)
+export const OPENING_HOURS_CONFIG: MonthlyOpeningHours = {
+  months: [
+    { open: 8,  close: 17 },  // January:   7:30 - 17:00
+    { open: 7,  close: 18 },  // February:  7:00 - 18:00
+    { open: 6,  close: 19 },  // March:     6:00 - 19:00
+    { open: 6,  close: 21 },  // April:     6:00 - 20:30
+    { open: 6,  close: 22 },  // May:       6:00 - 21:30
+    { open: 6,  close: 23 },  // June:      6:00 - 22:30
+    { open: 6,  close: 23 },  // July:      6:00 - 22:30
+    { open: 6,  close: 22 },  // August:    6:00 - 21:30
+    { open: 6,  close: 21 },  // September: 6:00 - 20:30
+    { open: 7,  close: 19 },  // October:   7:00 - 19:00
+    { open: 7,  close: 18 },  // November:  7:00 - 18:00
+    { open: 8,  close: 17 },  // December:  7:30 - 17:00
   ]
 };
 
 // Scoring configuration for each activity
+// Rain: fully continuous based on probability (every % counts), plus intensity bonus
+// Old system had binary "is raining" check; new system uses pop as sole driver
 export const SCORING_CONFIG: ScoringConfig = {
   cycling: {
-    rain: { base: -40, maxPenalty: 20, threshold: 0.2, exponent: 1.5 },
+    rain: { maxPenalty: 55, exponent: 1.3, intensityMax: 10, intensityScale: 5 },
     wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
     crowd: { multiplier: 0.25 },
     cold: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
@@ -176,7 +171,7 @@ export const SCORING_CONFIG: ScoringConfig = {
     uv: { threshold: 3, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
   jogging: {
-    rain: { base: -25, maxPenalty: 12, threshold: 0.3, exponent: 1.5 },
+    rain: { maxPenalty: 32, exponent: 1.3, intensityMax: 8, intensityScale: 5 },
     wind: { threshold: 5, maxPenalty: 15, range: 8, exponent: 1.2 },
     crowd: { multiplier: 0.1 },
     cold: { threshold: 10, maxPenalty: 20, range: 10, exponent: 1.1 },
@@ -185,7 +180,7 @@ export const SCORING_CONFIG: ScoringConfig = {
     uv: { threshold: 3, maxPenalty: 25, range: 7, exponent: 1.3 }
   },
   kiting: {
-    rain: { base: -30, maxPenalty: 15, threshold: 0.3, exponent: 1.5 },
+    rain: { maxPenalty: 40, exponent: 1.3, intensityMax: 8, intensityScale: 5 },
     wind: {
       tooLightPenalty: -50, tooLightThreshold: 5,      // < 5 m/s: Too light
       optimalMin: 7, optimalMax: 9,                     // 7-9 m/s: Sweet spot (no penalty)
@@ -200,7 +195,7 @@ export const SCORING_CONFIG: ScoringConfig = {
     uv: { threshold: 4, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
   socializing: {
-    rain: { base: -60, maxPenalty: 20, threshold: 0.2, exponent: 1.6 },
+    rain: { maxPenalty: 70, exponent: 1.4, intensityMax: 12, intensityScale: 4 },
     wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
     crowd: { multiplier: 0.25 },
     cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
@@ -215,26 +210,8 @@ export const SCORING_CONFIG: ScoringConfig = {
 // ============================================================================
 
 export const getOpeningHours = (date: Date): OpeningHours => {
-  const month = date.getMonth();
-
-  // Find the matching period for this month
-  for (const period of OPENING_HOURS_CONFIG.periods) {
-    // Handle periods that wrap around the year (e.g., Oct-Mar)
-    if (period.startMonth <= period.endMonth) {
-      // Normal period (doesn't wrap around year)
-      if (month >= period.startMonth && month <= period.endMonth) {
-        return { open: period.open, close: period.close };
-      }
-    } else {
-      // Period wraps around year (e.g., startMonth=9, endMonth=2 means Oct-Mar)
-      if (month >= period.startMonth || month <= period.endMonth) {
-        return { open: period.open, close: period.close };
-      }
-    }
-  }
-
-  // Fallback (should not happen if config is complete)
-  return { open: 7, close: 21 };
+  const month = date.getMonth(); // 0 = January, 11 = December
+  return OPENING_HOURS_CONFIG.months[month] ?? { open: 7, close: 18 };
 };
 
 export const isOpen = (hour: number, date: Date): boolean => {
@@ -245,16 +222,43 @@ export const isOpen = (hour: number, date: Date): boolean => {
 export const calculateCrowdFactor = (
   hour: number,
   dayOfWeek: number,
+  month: number,
   temp: number,
-  weatherCondition: string
+  pop: number,
+  cloudCover: number
 ): number => {
   let crowdScore = 0;
+
+  // Day of week: weekends much busier
   if (dayOfWeek === 0 || dayOfWeek === 6) crowdScore += 30;
+
+  // Time of day: peak midday-afternoon, shoulders morning/evening
   if (hour >= 11 && hour <= 18) crowdScore += 25;
   else if (hour >= 9 && hour < 11) crowdScore += 15;
   else if (hour > 18 && hour <= 20) crowdScore += 15;
-  if (temp > 15 && temp < 25 && !weatherCondition.includes('rain')) crowdScore += 20;
-  if (weatherCondition.includes('rain') || temp < 5 || temp > 30) crowdScore -= 20;
+
+  // Season: summer months draw far more visitors
+  // Bell curve peaking Jun-Aug (months 5-7)
+  const seasonalFactors = [5, 5, 10, 15, 20, 25, 25, 25, 20, 15, 5, 5];
+  crowdScore += seasonalFactors[month] ?? 5;
+
+  // Temperature: continuous bell curve centered around 22°C
+  // Peak crowd-drawing temp is ~22°C, drops off in both directions
+  if (temp >= 10 && temp <= 35) {
+    const tempIdeal = 22;
+    const tempSpread = 12;
+    const tempAttraction = Math.max(0, 1 - Math.pow((temp - tempIdeal) / tempSpread, 2));
+    crowdScore += Math.round(tempAttraction * 15);
+  }
+
+  // Rain probability: continuous deterrent (higher pop = fewer people)
+  // 100% rain chance scares away most people
+  crowdScore -= Math.round(pop * 25);
+
+  // Cloud cover: sunny days attract more people (0% clouds = +10, 100% = 0)
+  const sunnyBonus = Math.round((1 - cloudCover / 100) * 10);
+  crowdScore += sunnyBonus;
+
   return Math.max(0, Math.min(100, crowdScore));
 };
 
@@ -262,11 +266,33 @@ export const calculateCrowdFactor = (
 // Scoring Functions
 // ============================================================================
 
+/**
+ * Calculate continuous rain penalty based on probability and intensity.
+ * Every percentage of rain probability contributes to the penalty.
+ * Actual precipitation amount adds an intensity bonus on top.
+ */
+const calculateRainPenalty = (pop: number, precipitationMm: number, config: RainConfig): number => {
+  if (pop <= 0) return 0;
+
+  // Probability-based penalty: continuous from 0% to 100%
+  const probPenalty = Math.pow(Math.min(1, pop), config.exponent) * config.maxPenalty;
+
+  // Intensity bonus: actual precipitation amount increases severity
+  let intensityPenalty = 0;
+  if (precipitationMm > 0) {
+    intensityPenalty = Math.min(config.intensityMax,
+      (precipitationMm / config.intensityScale) * config.intensityMax);
+  }
+
+  return probPenalty + intensityPenalty;
+};
+
 export const calculateCyclingScore = (hourData: HourData): number => {
   let score = 100;
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
   const dayOfWeek = date.getDay();
+  const month = date.getMonth();
   const config = SCORING_CONFIG.cycling;
 
   if (!isOpen(hour, date)) return 0;
@@ -276,20 +302,9 @@ export const calculateCyclingScore = (hourData: HourData): number => {
     return 0; // Absolutely not safe
   }
 
-  // Rain penalty - actual rain is worst, but high probability also penalized
-  const pop = hourData.pop;
-  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
-
-  // Base penalty if actually raining
-  if (isActuallyRaining) {
-    score += config.rain.base; // base is negative (e.g., -40)
-  }
-
-  // Additional penalty based on rain probability
-  if (pop > config.rain.threshold) {
-    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    score -= probPenalty;
-  }
+  // Rain penalty - fully continuous based on probability + intensity
+  const precipMm = hourData.rain?.['1h'] ?? 0;
+  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
 
   // Wind penalty
   const windSpeed = hourData.wind_speed;
@@ -299,7 +314,7 @@ export const calculateCyclingScore = (hourData: HourData): number => {
   }
 
   // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties
@@ -343,6 +358,7 @@ export const calculateJoggingScore = (hourData: HourData): number => {
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
   const dayOfWeek = date.getDay();
+  const month = date.getMonth();
   const config = SCORING_CONFIG.jogging;
 
   if (!isOpen(hour, date)) return 0;
@@ -352,20 +368,9 @@ export const calculateJoggingScore = (hourData: HourData): number => {
     return 0; // Absolutely not safe
   }
 
-  // Rain penalty - actual rain is worst, but high probability also penalized
-  const pop = hourData.pop;
-  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
-
-  // Base penalty if actually raining
-  if (isActuallyRaining) {
-    score += config.rain.base; // base is negative (e.g., -40)
-  }
-
-  // Additional penalty based on rain probability
-  if (pop > config.rain.threshold) {
-    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    score -= probPenalty;
-  }
+  // Rain penalty - fully continuous based on probability + intensity
+  const precipMm = hourData.rain?.['1h'] ?? 0;
+  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
 
   // Wind penalty
   const windSpeed = hourData.wind_speed;
@@ -375,7 +380,7 @@ export const calculateJoggingScore = (hourData: HourData): number => {
   }
 
   // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties
@@ -419,6 +424,7 @@ export const calculateKitingScore = (hourData: HourData): number => {
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
   const dayOfWeek = date.getDay();
+  const month = date.getMonth();
   const config = SCORING_CONFIG.kiting;
 
   if (!isOpen(hour, date)) return 0;
@@ -445,23 +451,12 @@ export const calculateKitingScore = (hourData: HourData): number => {
     score += w.veryDangerousPenalty;
   }
 
-  // Rain penalty - actual rain is worst, but high probability also penalized
-  const pop = hourData.pop;
-  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
-
-  // Base penalty if actually raining
-  if (isActuallyRaining) {
-    score += config.rain.base; // base is negative (e.g., -40)
-  }
-
-  // Additional penalty based on rain probability
-  if (pop > config.rain.threshold) {
-    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    score -= probPenalty;
-  }
+  // Rain penalty - fully continuous based on probability + intensity
+  const precipMm = hourData.rain?.['1h'] ?? 0;
+  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
 
   // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties
@@ -501,6 +496,7 @@ export const calculateSocializingScore = (hourData: HourData): number => {
   const date = new Date(hourData.dt * 1000);
   const hour = date.getHours();
   const dayOfWeek = date.getDay();
+  const month = date.getMonth();
   const config = SCORING_CONFIG.socializing;
 
   if (!isOpen(hour, date)) return 0;
@@ -510,20 +506,9 @@ export const calculateSocializingScore = (hourData: HourData): number => {
     return 0; // Pack up and go home
   }
 
-  // Rain penalty - actual rain is worst, but high probability also penalized
-  const pop = hourData.pop;
-  const isActuallyRaining = hourData.weather[0]?.main.toLowerCase().includes('rain');
-
-  // Base penalty if actually raining
-  if (isActuallyRaining) {
-    score += config.rain.base; // base is negative (e.g., -40)
-  }
-
-  // Additional penalty based on rain probability
-  if (pop > config.rain.threshold) {
-    const probPenalty = Math.pow((pop - config.rain.threshold) / (1 - config.rain.threshold), config.rain.exponent) * config.rain.maxPenalty;
-    score -= probPenalty;
-  }
+  // Rain penalty - fully continuous based on probability + intensity
+  const precipMm = hourData.rain?.['1h'] ?? 0;
+  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
 
   // Wind penalty
   const windSpeed = hourData.wind_speed;
@@ -533,7 +518,7 @@ export const calculateSocializingScore = (hourData: HourData): number => {
   }
 
   // Crowd penalty (mild for socializing - crowds less of an issue)
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, hourData.temp, hourData.weather[0]?.main || '');
+  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
   score -= (crowdFactor * config.crowd.multiplier);
 
   // Temperature penalties
