@@ -409,8 +409,10 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
                     {calculateCrowdFactor(
                       new Date(selectedHour.dt * 1000).getHours(),
                       new Date(selectedHour.dt * 1000).getDay(),
+                      new Date(selectedHour.dt * 1000).getMonth(),
                       selectedHour.temp,
-                      selectedHour.weather[0]?.main || ''
+                      selectedHour.pop,
+                      selectedHour.clouds ?? 50
                     ).toFixed(0)}%
                   </span>
                 </div>
@@ -650,8 +652,8 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
                     <div className="text-xs mt-1 ml-4">Not safe in exposed area</div>
                   </li>
                   <li>
-                    <strong>Rain:</strong> -40 base + up to -20 for probability
-                    <div className="text-xs mt-1 ml-4">Active rain is worst, but high chance also penalized</div>
+                    <strong>Rain:</strong> Continuous up to -55 by probability + up to -10 intensity
+                    <div className="text-xs mt-1 ml-4">Every % of rain chance counts: 20% = -8, 50% = -23, 80% = -42</div>
                   </li>
                   <li>
                     <strong>Wind:</strong> Gradual from 3 m/s
@@ -659,7 +661,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
                   </li>
                   <li>
                     <strong>Crowds:</strong> Up to -25 points
-                    <div className="text-xs mt-1 ml-4">Based on time, day, and weather</div>
+                    <div className="text-xs mt-1 ml-4">Based on time, day, season, weather, and sunshine</div>
                   </li>
                   <li>
                     <strong>Cold:</strong> Gradual below 12°C (max -40)
@@ -685,8 +687,8 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
                     <div className="text-xs mt-1 ml-4">Not safe in exposed area</div>
                   </li>
                   <li>
-                    <strong>Rain:</strong> -25 base + up to -12 for probability
-                    <div className="text-xs mt-1 ml-4">Light rain tolerable for running</div>
+                    <strong>Rain:</strong> Continuous up to -32 by probability + up to -8 intensity
+                    <div className="text-xs mt-1 ml-4">Light rain tolerable: 20% = -5, 50% = -13, 80% = -24</div>
                   </li>
                   <li>
                     <strong>Wind:</strong> Gradual from 5 m/s (max -15)
@@ -720,12 +722,12 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
                     <div className="text-xs mt-1 ml-4">&lt;5 m/s = -50 (too light), 5-11 m/s = no penalty, 11-13 m/s = -25, &gt;13 m/s = -50 (dangerous)</div>
                   </li>
                   <li>
-                    <strong>Rain:</strong> -30 base + up to -15 for probability
-                    <div className="text-xs mt-1 ml-4">Wet equipment, visibility issues</div>
+                    <strong>Rain:</strong> Continuous up to -40 by probability + up to -8 intensity
+                    <div className="text-xs mt-1 ml-4">Wet equipment, visibility: 20% = -6, 50% = -16, 80% = -31</div>
                   </li>
                   <li>
                     <strong>Crowds:</strong> Up to -35 points
-                    <div className="text-xs mt-1 ml-4">SAFETY: Need space for kite</div>
+                    <div className="text-xs mt-1 ml-4">SAFETY: Need space for kite (season and weather aware)</div>
                   </li>
                   <li>
                     <strong>Cold:</strong> Gradual below 10°C (max -40)
@@ -743,8 +745,8 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
                     <div className="text-xs mt-1 ml-4">Pack up and go home</div>
                   </li>
                   <li>
-                    <strong>Rain:</strong> -60 base + up to -20 penalty
-                    <div className="text-xs mt-1 ml-4">Ruins food, blankets, everything</div>
+                    <strong>Rain:</strong> Continuous up to -70 by probability + up to -12 intensity
+                    <div className="text-xs mt-1 ml-4">Ruins everything: 20% = -9, 50% = -27, 80% = -53</div>
                   </li>
                   <li>
                     <strong>Wind:</strong> Gradual above 3 m/s (max -40)
@@ -752,7 +754,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
                   </li>
                   <li>
                     <strong>Crowds:</strong> Up to -25 points
-                    <div className="text-xs mt-1 ml-4">Reduced impact on stationary activities</div>
+                    <div className="text-xs mt-1 ml-4">Based on time, day, season, weather, and sunshine</div>
                   </li>
                   <li>
                     <strong>Cold:</strong> Gradual below 15°C (max -35)

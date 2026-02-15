@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SCORING_CONFIG,
+  OPENING_HOURS_CONFIG,
   getOpeningHours,
   isOpen,
   calculateCrowdFactor,
@@ -11,109 +12,149 @@ import {
 } from './scoring';
 
 describe('Opening Hours Logic', () => {
+  describe('OPENING_HOURS_CONFIG', () => {
+    it('should have 12 months of opening hours', () => {
+      expect(OPENING_HOURS_CONFIG.months).toHaveLength(12);
+    });
+
+    it('should have earliest opening in summer months (6:00)', () => {
+      // March through September open at 6
+      for (const month of [2, 3, 4, 5, 6, 7, 8]) {
+        expect(OPENING_HOURS_CONFIG.months[month]!.open).toBe(6);
+      }
+    });
+
+    it('should have latest closing in June/July (23:00)', () => {
+      expect(OPENING_HOURS_CONFIG.months[5]!.close).toBe(23); // June
+      expect(OPENING_HOURS_CONFIG.months[6]!.close).toBe(23); // July
+    });
+
+    it('should have earliest closing in winter (17:00 for Jan/Dec)', () => {
+      expect(OPENING_HOURS_CONFIG.months[0]!.close).toBe(17);  // January
+      expect(OPENING_HOURS_CONFIG.months[11]!.close).toBe(17); // December
+    });
+  });
+
   describe('getOpeningHours', () => {
-    it('should return summer hours (6-22) for April', () => {
-      const date = new Date(2024, 3, 15); // April 15
-      const hours = getOpeningHours(date);
-      expect(hours).toEqual({ open: 6, close: 22 });
-    });
-
-    it('should return summer hours (6-22) for September', () => {
-      const date = new Date(2024, 8, 30); // September 30
-      const hours = getOpeningHours(date);
-      expect(hours).toEqual({ open: 6, close: 22 });
-    });
-
-    it('should return winter hours (7-21) for October', () => {
-      const date = new Date(2024, 9, 1); // October 1
-      const hours = getOpeningHours(date);
-      expect(hours).toEqual({ open: 7, close: 21 });
-    });
-
-    it('should return winter hours (7-21) for March', () => {
-      const date = new Date(2024, 2, 31); // March 31
-      const hours = getOpeningHours(date);
-      expect(hours).toEqual({ open: 7, close: 21 });
-    });
-
-    it('should return winter hours (7-21) for December (wraparound)', () => {
-      const date = new Date(2024, 11, 25); // December 25
-      const hours = getOpeningHours(date);
-      expect(hours).toEqual({ open: 7, close: 21 });
-    });
-
-    it('should return winter hours (7-21) for January (wraparound)', () => {
+    it('should return January hours (8-17)', () => {
       const date = new Date(2024, 0, 15); // January 15
       const hours = getOpeningHours(date);
-      expect(hours).toEqual({ open: 7, close: 21 });
+      expect(hours).toEqual({ open: 8, close: 17 });
+    });
+
+    it('should return June hours (6-23)', () => {
+      const date = new Date(2024, 5, 15); // June 15
+      const hours = getOpeningHours(date);
+      expect(hours).toEqual({ open: 6, close: 23 });
+    });
+
+    it('should return October hours (7-19)', () => {
+      const date = new Date(2024, 9, 1); // October 1
+      const hours = getOpeningHours(date);
+      expect(hours).toEqual({ open: 7, close: 19 });
+    });
+
+    it('should return December hours (8-17)', () => {
+      const date = new Date(2024, 11, 25); // December 25
+      const hours = getOpeningHours(date);
+      expect(hours).toEqual({ open: 8, close: 17 });
+    });
+
+    it('should return April hours (6-21)', () => {
+      const date = new Date(2024, 3, 15); // April 15
+      const hours = getOpeningHours(date);
+      expect(hours).toEqual({ open: 6, close: 21 });
     });
   });
 
   describe('isOpen', () => {
-    it('should return true for 10:00 in summer', () => {
+    it('should return true for 10:00 in June', () => {
       const date = new Date(2024, 5, 15); // June 15
       expect(isOpen(10, date)).toBe(true);
     });
 
-    it('should return false for 5:00 in summer (before opening)', () => {
+    it('should return false for 5:00 in June (before opening)', () => {
       const date = new Date(2024, 5, 15); // June 15
       expect(isOpen(5, date)).toBe(false);
     });
 
-    it('should return false for 22:00 in summer (at closing)', () => {
+    it('should return true for 22:00 in June (field open till 22:30)', () => {
       const date = new Date(2024, 5, 15); // June 15
-      expect(isOpen(22, date)).toBe(false);
+      expect(isOpen(22, date)).toBe(true);
     });
 
-    it('should return true for 7:00 in winter', () => {
-      const date = new Date(2024, 11, 15); // December 15
-      expect(isOpen(7, date)).toBe(true);
+    it('should return false for 23:00 in June (at closing)', () => {
+      const date = new Date(2024, 5, 15); // June 15
+      expect(isOpen(23, date)).toBe(false);
     });
 
-    it('should return false for 6:00 in winter (before opening)', () => {
-      const date = new Date(2024, 11, 15); // December 15
-      expect(isOpen(6, date)).toBe(false);
+    it('should return false for 7:00 in January (before opening at 8)', () => {
+      const date = new Date(2024, 0, 15); // January 15
+      expect(isOpen(7, date)).toBe(false);
     });
 
-    it('should return false for 21:00 in winter (at closing)', () => {
+    it('should return true for 8:00 in January', () => {
+      const date = new Date(2024, 0, 15); // January 15
+      expect(isOpen(8, date)).toBe(true);
+    });
+
+    it('should return false for 17:00 in December (at closing)', () => {
       const date = new Date(2024, 11, 15); // December 15
-      expect(isOpen(21, date)).toBe(false);
+      expect(isOpen(17, date)).toBe(false);
+    });
+
+    it('should return true for 16:00 in December (last open hour)', () => {
+      const date = new Date(2024, 11, 15); // December 15
+      expect(isOpen(16, date)).toBe(true);
     });
   });
 });
 
 describe('Crowd Factor Calculation', () => {
+  // New signature: (hour, dayOfWeek, month, temp, pop, cloudCover)
   it('should return higher crowd score on weekends', () => {
-    const weekday = calculateCrowdFactor(14, 3, 20, 'Clear'); // Wednesday
-    const weekend = calculateCrowdFactor(14, 6, 20, 'Clear'); // Saturday
+    const weekday = calculateCrowdFactor(14, 3, 5, 20, 0.1, 30); // Wednesday, June
+    const weekend = calculateCrowdFactor(14, 6, 5, 20, 0.1, 30); // Saturday, June
     expect(weekend).toBeGreaterThan(weekday);
   });
 
   it('should return higher crowd score during peak hours (11-18)', () => {
-    const morning = calculateCrowdFactor(9, 3, 20, 'Clear');
-    const peak = calculateCrowdFactor(14, 3, 20, 'Clear');
+    const morning = calculateCrowdFactor(9, 3, 5, 20, 0.1, 30);
+    const peak = calculateCrowdFactor(14, 3, 5, 20, 0.1, 30);
     expect(peak).toBeGreaterThan(morning);
   });
 
-  it('should return higher crowd score in good weather (15-25°C, no rain)', () => {
-    const goodWeather = calculateCrowdFactor(14, 6, 20, 'Clear');
-    const badWeather = calculateCrowdFactor(14, 6, 3, 'Clear');
-    expect(goodWeather).toBeGreaterThan(badWeather);
+  it('should return higher crowd score in summer months', () => {
+    const winter = calculateCrowdFactor(14, 6, 0, 20, 0.1, 30); // January
+    const summer = calculateCrowdFactor(14, 6, 6, 20, 0.1, 30); // July
+    expect(summer).toBeGreaterThan(winter);
   });
 
-  it('should return lower crowd score when raining', () => {
-    const clear = calculateCrowdFactor(14, 6, 20, 'Clear');
-    const rainy = calculateCrowdFactor(14, 6, 20, 'rain'); // lowercase 'rain' to match includes()
-    expect(rainy).toBeLessThan(clear);
+  it('should return higher crowd score at ideal temperature (~22°C)', () => {
+    const cold = calculateCrowdFactor(14, 6, 5, 5, 0.1, 30);
+    const ideal = calculateCrowdFactor(14, 6, 5, 22, 0.1, 30);
+    expect(ideal).toBeGreaterThan(cold);
+  });
+
+  it('should return lower crowd score with high rain probability', () => {
+    const dry = calculateCrowdFactor(14, 6, 5, 20, 0.1, 30);
+    const rainy = calculateCrowdFactor(14, 6, 5, 20, 0.9, 30);
+    expect(rainy).toBeLessThan(dry);
+  });
+
+  it('should return higher crowd score on sunny days (low cloud cover)', () => {
+    const sunny = calculateCrowdFactor(14, 6, 5, 20, 0.1, 10);
+    const cloudy = calculateCrowdFactor(14, 6, 5, 20, 0.1, 90);
+    expect(sunny).toBeGreaterThan(cloudy);
   });
 
   it('should never return negative crowd score', () => {
-    const score = calculateCrowdFactor(3, 2, 1, 'Rain');
+    const score = calculateCrowdFactor(3, 2, 0, 1, 1.0, 100); // Bad conditions
     expect(score).toBeGreaterThanOrEqual(0);
   });
 
   it('should never exceed 100', () => {
-    const score = calculateCrowdFactor(14, 6, 20, 'Clear'); // Perfect conditions
+    const score = calculateCrowdFactor(14, 6, 6, 22, 0.0, 0); // Perfect conditions
     expect(score).toBeLessThanOrEqual(100);
   });
 });
@@ -125,6 +166,7 @@ describe('Cycling Score', () => {
     wind_speed: 2,
     pop: 0.1,
     uvi: 3,
+    clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
     air_quality: { aqi: 1 },
     hasThunderstorm: false,
@@ -134,7 +176,7 @@ describe('Cycling Score', () => {
   it('should return high score for good cycling conditions', () => {
     const hourData = createMockHourData();
     const score = calculateCyclingScore(hourData);
-    expect(score).toBeGreaterThan(75); // Realistic expectation with crowd penalties
+    expect(score).toBeGreaterThan(70);
   });
 
   it('should return 0 for thunderstorm', () => {
@@ -159,7 +201,7 @@ describe('Cycling Score', () => {
 
   it('should penalize very cold temperatures (0°C) heavily', () => {
     const score = calculateCyclingScore(createMockHourData({ temp: 0 }));
-    expect(score).toBeLessThan(65); // Should have significant penalty
+    expect(score).toBeLessThan(65);
   });
 
   it('should penalize hot temperatures (> 24°C)', () => {
@@ -179,22 +221,29 @@ describe('Cycling Score', () => {
     expect(score).toBeLessThan(65);
   });
 
-  it('should penalize high rain probability', () => {
-    const normal = calculateCyclingScore(createMockHourData({ pop: 0.1 }));
-    const rainy = calculateCyclingScore(createMockHourData({ pop: 0.8 }));
-    expect(rainy).toBeLessThan(normal);
+  it('should penalize continuously with increasing rain probability', () => {
+    const low = calculateCyclingScore(createMockHourData({ pop: 0.1 }));
+    const medium = calculateCyclingScore(createMockHourData({ pop: 0.5 }));
+    const high = calculateCyclingScore(createMockHourData({ pop: 0.8 }));
+    expect(medium).toBeLessThan(low);
+    expect(high).toBeLessThan(medium);
   });
 
-  it('should additionally penalize actual rain', () => {
-    const highProbNoCurrent = calculateCyclingScore(createMockHourData({
+  it('should penalize even small rain probabilities (10%)', () => {
+    const noPop = calculateCyclingScore(createMockHourData({ pop: 0.0 }));
+    const lowPop = calculateCyclingScore(createMockHourData({ pop: 0.1 }));
+    expect(lowPop).toBeLessThan(noPop);
+  });
+
+  it('should apply extra penalty for actual precipitation intensity', () => {
+    const probOnly = calculateCyclingScore(createMockHourData({
       pop: 0.8,
-      weather: [{ main: 'Clouds', description: 'cloudy' }]
     }));
-    const highProbAndRain = calculateCyclingScore(createMockHourData({
+    const withRain = calculateCyclingScore(createMockHourData({
       pop: 0.8,
-      weather: [{ main: 'Rain', description: 'light rain' }]
+      rain: { '1h': 3.0 },
     }));
-    expect(highProbAndRain).toBeLessThan(highProbNoCurrent);
+    expect(withRain).toBeLessThan(probOnly);
   });
 
   it('should penalize poor air quality', () => {
@@ -216,6 +265,7 @@ describe('Cycling Score', () => {
       pop: 1.0,
       uvi: 11,
       air_quality: { aqi: 5 },
+      rain: { '1h': 10 },
       weather: [{ main: 'Rain', description: 'heavy rain' }],
     });
     const score = calculateCyclingScore(worstCase);
@@ -235,13 +285,14 @@ describe('Jogging Score', () => {
     wind_speed: 2,
     pop: 0.1,
     uvi: 3,
+    clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
     air_quality: { aqi: 1 },
     hasThunderstorm: false,
     ...overrides,
   });
 
-  it('should return 100 for perfect jogging conditions', () => {
+  it('should return high score for perfect jogging conditions', () => {
     const hourData = createMockHourData();
     const score = calculateJoggingScore(hourData);
     expect(score).toBeGreaterThan(85);
@@ -257,47 +308,50 @@ describe('Jogging Score', () => {
     const coldData = createMockHourData({ temp: 11 });
     const cyclingScore = calculateCyclingScore(coldData);
     const joggingScore = calculateJoggingScore(coldData);
-    // At 11°C, cycling should be penalized but jogging should be fine
     expect(joggingScore).toBeGreaterThan(cyclingScore);
   });
 
   it('should be less tolerant of heat than cycling (threshold: 22°C vs 24°C)', () => {
-    const hotData = createMockHourData({ temp: 30 });
+    // Use weekday off-peak to isolate heat penalty from crowd effects
+    const hotData = createMockHourData({
+      temp: 30,
+      dt: new Date(2024, 5, 12, 8, 0).getTime() / 1000, // Wednesday 8AM
+    });
     const cyclingScore = calculateCyclingScore(hotData);
     const joggingScore = calculateJoggingScore(hotData);
-    // At 30°C, jogging should be more penalized than cycling (lower threshold: 22 vs 24)
     expect(joggingScore).toBeLessThan(cyclingScore);
   });
 
   it('should penalize heat heavily (> 22°C)', () => {
     const normal = calculateJoggingScore(createMockHourData({ temp: 15 }));
     const hot = calculateJoggingScore(createMockHourData({ temp: 30 }));
-    expect(hot).toBeLessThan(normal - 20); // Significant penalty
+    expect(hot).toBeLessThan(normal - 20);
   });
 
   it('should be more tolerant of wind than cycling', () => {
     const windyData = createMockHourData({ wind_speed: 6 });
     const cyclingScore = calculateCyclingScore(windyData);
     const joggingScore = calculateJoggingScore(windyData);
-    // Jogging has higher wind threshold (5 vs 3)
     expect(joggingScore).toBeGreaterThanOrEqual(cyclingScore);
   });
 
-  it('should be more tolerant of rain than cycling', () => {
-    const rainyData = createMockHourData({
-      pop: 0.6,
-      weather: [{ main: 'Rain', description: 'light rain' }]
-    });
+  it('should have lower rain penalty than cycling at same probability', () => {
+    const rainyData = createMockHourData({ pop: 0.8 });
     const cyclingScore = calculateCyclingScore(rainyData);
     const joggingScore = calculateJoggingScore(rainyData);
-    // Jogging should be more rain-tolerant
     expect(joggingScore).toBeGreaterThan(cyclingScore);
+  });
+
+  it('should penalize rain continuously', () => {
+    const low = calculateJoggingScore(createMockHourData({ pop: 0.2 }));
+    const high = calculateJoggingScore(createMockHourData({ pop: 0.8 }));
+    expect(high).toBeLessThan(low);
   });
 
   it('should penalize high UV index significantly', () => {
     const normal = calculateJoggingScore(createMockHourData({ uvi: 2 }));
     const highUV = calculateJoggingScore(createMockHourData({ uvi: 10 }));
-    expect(highUV).toBeLessThan(normal - 15); // Should have UV penalty
+    expect(highUV).toBeLessThan(normal - 15);
   });
 });
 
@@ -308,6 +362,7 @@ describe('Kiting Score', () => {
     wind_speed: 8, // Ideal for kiting
     pop: 0.1,
     uvi: 4,
+    clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
     air_quality: { aqi: 1 },
     hasThunderstorm: false,
@@ -315,9 +370,13 @@ describe('Kiting Score', () => {
   });
 
   it('should return high score for ideal kiting conditions (7-9 m/s wind)', () => {
-    const hourData = createMockHourData({ wind_speed: 8 });
+    // Use weekday off-peak to reduce crowd penalty (kiting has highest crowd multiplier)
+    const hourData = createMockHourData({
+      wind_speed: 8,
+      dt: new Date(2024, 5, 12, 8, 0).getTime() / 1000, // Wednesday 8AM
+    });
     const score = calculateKitingScore(hourData);
-    expect(score).toBeGreaterThan(70); // Realistic with crowd penalties
+    expect(score).toBeGreaterThan(70);
   });
 
   it('should return 0 for thunderstorm (extremely dangerous)', () => {
@@ -337,7 +396,6 @@ describe('Kiting Score', () => {
     const wind8 = calculateKitingScore(createMockHourData({ wind_speed: 8 }));
     const wind11 = calculateKitingScore(createMockHourData({ wind_speed: 11 }));
 
-    // All should be reasonably high (>60), with 8 m/s being best
     expect(wind5).toBeGreaterThan(60);
     expect(wind8).toBeGreaterThan(60);
     expect(wind11).toBeGreaterThan(60);
@@ -358,19 +416,23 @@ describe('Kiting Score', () => {
   it('should be sensitive to cold (threshold: 10°C)', () => {
     const normal = calculateKitingScore(createMockHourData({ temp: 15 }));
     const cold = calculateKitingScore(createMockHourData({ temp: 0 }));
-    expect(cold).toBeLessThan(normal); // Should have cold penalty
+    expect(cold).toBeLessThan(normal);
   });
 
   it('should apply flat penalty for extreme heat (> 30°C)', () => {
-    // Test that extreme heat has config flatPenalty value
     expect(SCORING_CONFIG.kiting.heat.flatPenalty).toBe(-10);
     expect(SCORING_CONFIG.kiting.heat.threshold).toBe(30);
   });
 
   it('should have highest crowd penalty multiplier', () => {
-    // Verify kiting has highest crowd multiplier in config
     expect(SCORING_CONFIG.kiting.crowd.multiplier).toBeGreaterThan(SCORING_CONFIG.cycling.crowd.multiplier);
     expect(SCORING_CONFIG.kiting.crowd.multiplier).toBeGreaterThan(SCORING_CONFIG.jogging.crowd.multiplier);
+  });
+
+  it('should penalize rain continuously', () => {
+    const low = calculateKitingScore(createMockHourData({ pop: 0.1 }));
+    const high = calculateKitingScore(createMockHourData({ pop: 0.8 }));
+    expect(high).toBeLessThan(low);
   });
 });
 
@@ -381,6 +443,7 @@ describe('Socializing Score', () => {
     wind_speed: 2,
     pop: 0.05,
     uvi: 3,
+    clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
     air_quality: { aqi: 1 },
     hasThunderstorm: false,
@@ -390,7 +453,7 @@ describe('Socializing Score', () => {
   it('should return high score for good picnic conditions', () => {
     const hourData = createMockHourData();
     const score = calculateSocializingScore(hourData);
-    expect(score).toBeGreaterThan(75); // Realistic with crowd penalties
+    expect(score).toBeGreaterThan(70);
   });
 
   it('should return 0 for thunderstorm', () => {
@@ -399,27 +462,28 @@ describe('Socializing Score', () => {
     expect(score).toBe(0);
   });
 
-  it('should have highest rain penalty (base: -60)', () => {
-    const rainyData = createMockHourData({
-      pop: 0.8,
-      weather: [{ main: 'Rain', description: 'heavy rain' }]
-    });
-
+  it('should have highest rain penalty of all activities', () => {
+    const rainyData = createMockHourData({ pop: 0.8 });
     const cyclingScore = calculateCyclingScore(rainyData);
     const socializingScore = calculateSocializingScore(rainyData);
-
-    // Socializing should be more affected by rain
     expect(socializingScore).toBeLessThan(cyclingScore);
+  });
+
+  it('should penalize rain continuously with every % of probability', () => {
+    const noPop = calculateSocializingScore(createMockHourData({ pop: 0.0 }));
+    const lowPop = calculateSocializingScore(createMockHourData({ pop: 0.1 }));
+    const medPop = calculateSocializingScore(createMockHourData({ pop: 0.5 }));
+    const highPop = calculateSocializingScore(createMockHourData({ pop: 0.9 }));
+    expect(lowPop).toBeLessThan(noPop);
+    expect(medPop).toBeLessThan(lowPop);
+    expect(highPop).toBeLessThan(medPop);
   });
 
   it('should be most sensitive to cold (threshold: 15°C)', () => {
     const coldData = createMockHourData({ temp: 12 });
-
     const cyclingScore = calculateCyclingScore(coldData);
     const joggingScore = calculateJoggingScore(coldData);
     const socializingScore = calculateSocializingScore(coldData);
-
-    // At 12°C, socializing should be most affected (sitting still)
     expect(socializingScore).toBeLessThan(cyclingScore);
     expect(socializingScore).toBeLessThan(joggingScore);
   });
@@ -427,8 +491,8 @@ describe('Socializing Score', () => {
   it('should heavily penalize very cold temperatures (< 5°C)', () => {
     const normal = calculateSocializingScore(createMockHourData({ temp: 20 }));
     const freezing = calculateSocializingScore(createMockHourData({ temp: 0 }));
-    expect(freezing).toBeLessThan(normal); // Should have significant cold penalty
-    expect(freezing).toBeLessThan(65); // Should be quite low at 0°C
+    expect(freezing).toBeLessThan(normal);
+    expect(freezing).toBeLessThan(65);
   });
 
   it('should penalize wind (affects picnic setup)', () => {
@@ -446,7 +510,7 @@ describe('Socializing Score', () => {
   it('should be tolerant of moderate heat (threshold: 28°C)', () => {
     const data25C = createMockHourData({ temp: 25 });
     const score = calculateSocializingScore(data25C);
-    expect(score).toBeGreaterThan(80); // Should still be good
+    expect(score).toBeGreaterThan(70);
   });
 
   it('should penalize extreme heat (> 28°C)', () => {
@@ -463,6 +527,7 @@ describe('Edge Cases and Bounds', () => {
     wind_speed: 5,
     pop: 0.1,
     uvi: 3,
+    clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
     air_quality: { aqi: 1 },
     hasThunderstorm: false,
@@ -487,6 +552,15 @@ describe('Edge Cases and Bounds', () => {
     expect(() => calculateSocializingScore(noUV)).not.toThrow();
   });
 
+  it('all scoring functions should handle missing clouds data', () => {
+    const noClouds = createMockHourData({ clouds: undefined });
+
+    expect(() => calculateCyclingScore(noClouds)).not.toThrow();
+    expect(() => calculateJoggingScore(noClouds)).not.toThrow();
+    expect(() => calculateKitingScore(noClouds)).not.toThrow();
+    expect(() => calculateSocializingScore(noClouds)).not.toThrow();
+  });
+
   it('all scoring functions should return integer scores', () => {
     const data = createMockHourData();
 
@@ -503,6 +577,7 @@ describe('Edge Cases and Bounds', () => {
       pop: 1.0,
       uvi: 15,
       air_quality: { aqi: 5 },
+      rain: { '1h': 10 },
       weather: [{ main: 'Rain', description: 'heavy rain' }],
     });
 
@@ -537,5 +612,20 @@ describe('Edge Cases and Bounds', () => {
     scores.forEach(score => {
       expect(score).toBeLessThanOrEqual(100);
     });
+  });
+
+  it('rain penalty should scale from 0 at pop=0 to max at pop=1', () => {
+    const zeroPop = createMockHourData({ pop: 0.0 });
+    const fullPop = createMockHourData({ pop: 1.0 });
+    const zeroScore = calculateCyclingScore(zeroPop);
+    const fullScore = calculateCyclingScore(fullPop);
+    // Full probability should have much lower score
+    expect(fullScore).toBeLessThan(zeroScore - 30);
+  });
+
+  it('precipitation intensity should add penalty beyond probability alone', () => {
+    const probOnly = createMockHourData({ pop: 0.6 });
+    const withIntensity = createMockHourData({ pop: 0.6, rain: { '1h': 5.0 } });
+    expect(calculateCyclingScore(withIntensity)).toBeLessThan(calculateCyclingScore(probOnly));
   });
 });
