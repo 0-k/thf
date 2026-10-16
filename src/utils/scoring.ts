@@ -1,17 +1,38 @@
 /**
- * Scoring utilities for Tempelhofer Feld Activity Forecast
- * Extracted from App.jsx for testability
- * TypeScript version with full type safety
+ * Scoring for Tempelhofer Feld Activity Forecast.
+ *
+ * Every activity starts at 100 and only loses points (penalty-only).
+ * One engine scores all activities from SCORING_CONFIG and returns a
+ * breakdown, so the UI can show *why* an hour scored what it did.
  */
+
+import type { Activity, HourData, MonthlyOpeningHours, OpeningHours } from './types';
+import { berlinParts } from './time';
+import { getSunTimes } from './calendar';
+import { estimateCrowd, type CrowdEstimate } from './crowd';
+
+export type { Activity, HourData, OpeningHours, MonthlyOpeningHours, WeatherCondition, AirQuality } from './types';
+export { calculateCrowdFactor, estimateCrowd, type CrowdEstimate, type CrowdLevel } from './crowd';
 
 // ============================================================================
 // Type Definitions
 // ============================================================================
 
-export interface MonthlyOpeningHours {
-  /** Monthly opening hours, index 0 = January, 11 = December */
-  months: OpeningHours[];
+/** penalty = min(maxPenalty, ((value - threshold) / range) ^ exponent * maxPenalty) */
+export interface PowerPenaltyConfig {
+  threshold: number;
+  maxPenalty: number;
+  range: number;
+  exponent: number;
 }
+
+export type StandardWindConfig = PowerPenaltyConfig;
+export type TempConfig = PowerPenaltyConfig;
+export type UVConfig = PowerPenaltyConfig;
+/** Applied to the AQI level 1-5 derived from the European AQI (see aqiLevel) */
+export type AirQualityConfig = PowerPenaltyConfig;
+/** Applied to cloud cover in % */
+export type OvercastConfig = PowerPenaltyConfig;
 
 export interface RainConfig {
   maxPenalty: number;     // Total max penalty at 100% probability (e.g., 55)
@@ -20,55 +41,26 @@ export interface RainConfig {
   intensityScale: number; // Precipitation mm/h at which intensity penalty is maxed out
 }
 
-export interface StandardWindConfig {
-  threshold: number;
-  maxPenalty: number;
+export interface RampConfig {
   range: number;
   exponent: number;
+  maxPenalty: number;
 }
 
 export interface KitingWindConfig {
-  tooLightPenalty: number;
-  tooLightThreshold: number;
-  optimalMin: number;
-  optimalMax: number;
+  /** No wind penalty inside [workableMin, workableMax] m/s */
   workableMin: number;
   workableMax: number;
-  dangerousMin: number;
-  dangerousMax: number;
-  dangerousPenalty: number;
-  veryDangerousPenalty: number;
-  veryDangerousThreshold: number;
+  /** Penalty ramps up as wind drops below workableMin (maxPenalty reached at workableMin - range) */
+  tooLight: RampConfig;
+  /** Penalty ramps up as wind exceeds workableMax (maxPenalty reached at workableMax + range) */
+  tooStrong: RampConfig;
+  /** Penalty on gust spread (gust - mean wind, m/s): gusty wind yanks the kite */
+  gustiness: PowerPenaltyConfig;
 }
 
 export interface CrowdConfig {
   multiplier: number;
-}
-
-export interface TempConfig {
-  threshold: number;
-  maxPenalty: number;
-  range: number;
-  exponent: number;
-}
-
-export interface FlatTempConfig {
-  threshold: number;
-  flatPenalty: number;
-}
-
-export interface AirQualityConfig {
-  threshold: number;
-  maxPenalty: number;
-  range: number;
-  exponent: number;
-}
-
-export interface UVConfig {
-  threshold: number;
-  maxPenalty: number;
-  range: number;
-  exponent: number;
 }
 
 export interface StandardActivityConfig {
@@ -79,16 +71,11 @@ export interface StandardActivityConfig {
   heat: TempConfig;
   airQuality: AirQualityConfig;
   uv: UVConfig;
+  overcast?: OvercastConfig;
 }
 
-export interface KitingActivityConfig {
-  rain: RainConfig;
+export interface KitingActivityConfig extends Omit<StandardActivityConfig, 'wind'> {
   wind: KitingWindConfig;
-  crowd: CrowdConfig;
-  cold: TempConfig;
-  heat: FlatTempConfig;
-  airQuality: AirQualityConfig;
-  uv: UVConfig;
 }
 
 export interface ScoringConfig {
@@ -98,38 +85,26 @@ export interface ScoringConfig {
   socializing: StandardActivityConfig;
 }
 
-export interface WeatherCondition {
-  main: string;
-  description: string;
+export type PenaltyFactor =
+  | 'rain' | 'wind' | 'gusts' | 'crowd' | 'cold' | 'heat' | 'airQuality' | 'uv' | 'overcast';
+
+export interface Penalty {
+  factor: PenaltyFactor;
+  label: string;
+  /** Short human-readable cause, e.g. "40% chance, 0.6 mm" */
+  detail: string;
+  /** Points deducted (positive number, one decimal) */
+  points: number;
 }
 
-export interface AirQuality {
-  aqi: number;
-}
+export type HourStatus = 'open' | 'closed' | 'thunderstorm';
 
-export interface HourData {
-  dt: number;
-  temp: number;
-  feels_like?: number;
-  pressure?: number;
-  humidity?: number;
-  dew_point?: number;
-  uvi?: number;
-  clouds?: number;
-  visibility?: number;
-  wind_speed: number;
-  wind_deg?: number;
-  wind_gust?: number;
-  weather: WeatherCondition[];
-  pop: number;
-  rain?: { '1h': number };
-  air_quality?: AirQuality;
-  hasThunderstorm: boolean;
-}
-
-export interface OpeningHours {
-  open: number;
-  close: number;
+export interface ScoreBreakdown {
+  score: number;
+  status: HourStatus;
+  /** Sorted by points, largest first; empty when closed or thunderstorm */
+  penalties: Penalty[];
+  crowd: CrowdEstimate;
 }
 
 // ============================================================================
@@ -158,8 +133,7 @@ export const OPENING_HOURS_CONFIG: MonthlyOpeningHours = {
 };
 
 // Scoring configuration for each activity
-// Rain: fully continuous based on probability (every % counts), plus intensity bonus
-// Old system had binary "is raining" check; new system uses pop as sole driver
+// Rain: fully continuous based on probability (every % counts), plus intensity
 export const SCORING_CONFIG: ScoringConfig = {
   cycling: {
     rain: { maxPenalty: 55, exponent: 1.3, intensityMax: 10, intensityScale: 5 },
@@ -182,15 +156,14 @@ export const SCORING_CONFIG: ScoringConfig = {
   kiting: {
     rain: { maxPenalty: 40, exponent: 1.3, intensityMax: 8, intensityScale: 5 },
     wind: {
-      tooLightPenalty: -50, tooLightThreshold: 5,      // < 5 m/s: Too light
-      optimalMin: 7, optimalMax: 9,                     // 7-9 m/s: Sweet spot (no penalty)
-      workableMin: 5, workableMax: 11,                  // 5-11 m/s: Workable range (no penalty)
-      dangerousMin: 11, dangerousMax: 13, dangerousPenalty: -25,  // 11-13 m/s: Getting dangerous
-      veryDangerousPenalty: -50, veryDangerousThreshold: 13      // > 13 m/s: Very dangerous
+      workableMin: 5, workableMax: 11,                        // 5-11 m/s: no penalty
+      tooLight: { range: 3.5, exponent: 1.2, maxPenalty: 100 },  // 4 m/s = -22, 3 = -51, <=1.5 = -100 (can't fly)
+      tooStrong: { range: 5, exponent: 1.3, maxPenalty: 100 },   // 12 m/s = -12, 13 = -30, 14 = -51, >=16 = -100
+      gustiness: { threshold: 5, maxPenalty: 40, range: 8, exponent: 1.2 }, // gusts 5+ m/s above mean
     },
     crowd: { multiplier: 0.35 },
     cold: { threshold: 10, maxPenalty: 40, range: 10, exponent: 1.4 },
-    heat: { threshold: 30, flatPenalty: -10 },
+    heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.3 },
     airQuality: { threshold: 2, maxPenalty: 15, range: 3, exponent: 1.3 },
     uv: { threshold: 4, maxPenalty: 20, range: 6, exponent: 1.2 }
   },
@@ -201,7 +174,9 @@ export const SCORING_CONFIG: ScoringConfig = {
     cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
     heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.2 },
     airQuality: { threshold: 2, maxPenalty: 20, range: 3, exponent: 1.3 },
-    uv: { threshold: 3, maxPenalty: 30, range: 7, exponent: 1.3 }
+    uv: { threshold: 3, maxPenalty: 30, range: 7, exponent: 1.3 },
+    // Sitting on the grass under a grey sky (daylight hours only)
+    overcast: { threshold: 40, maxPenalty: 20, range: 60, exponent: 1.2 }
   }
 };
 
@@ -209,75 +184,56 @@ export const SCORING_CONFIG: ScoringConfig = {
 // Utility Functions
 // ============================================================================
 
+/** Opening hours for the Berlin calendar month of `date`. */
 export const getOpeningHours = (date: Date): OpeningHours => {
-  const month = date.getMonth(); // 0 = January, 11 = December
+  const month = berlinParts(Math.floor(date.getTime() / 1000)).month;
   return OPENING_HOURS_CONFIG.months[month] ?? { open: 7, close: 18 };
 };
 
+/** Is the field open during Berlin hour `hour` of the Berlin month containing `date`? */
 export const isOpen = (hour: number, date: Date): boolean => {
   const hours = getOpeningHours(date);
   return hour >= hours.open && hour < hours.close;
 };
 
-export const calculateCrowdFactor = (
-  hour: number,
-  dayOfWeek: number,
-  month: number,
-  temp: number,
-  pop: number,
-  cloudCover: number
-): number => {
-  let crowdScore = 0;
-
-  // Day of week: weekends much busier
-  if (dayOfWeek === 0 || dayOfWeek === 6) crowdScore += 30;
-
-  // Time of day: peak midday-afternoon, shoulders morning/evening
-  if (hour >= 11 && hour <= 18) crowdScore += 25;
-  else if (hour >= 9 && hour < 11) crowdScore += 15;
-  else if (hour > 18 && hour <= 20) crowdScore += 15;
-
-  // Season: summer months draw far more visitors
-  // Bell curve peaking Jun-Aug (months 5-7)
-  const seasonalFactors = [5, 5, 10, 15, 20, 25, 25, 25, 20, 15, 5, 5];
-  crowdScore += seasonalFactors[month] ?? 5;
-
-  // Temperature: continuous bell curve centered around 22°C
-  // Peak crowd-drawing temp is ~22°C, drops off in both directions
-  if (temp >= 10 && temp <= 35) {
-    const tempIdeal = 22;
-    const tempSpread = 12;
-    const tempAttraction = Math.max(0, 1 - Math.pow((temp - tempIdeal) / tempSpread, 2));
-    crowdScore += Math.round(tempAttraction * 15);
-  }
-
-  // Rain probability: continuous deterrent (higher pop = fewer people)
-  // 100% rain chance scares away most people
-  crowdScore -= Math.round(pop * 25);
-
-  // Cloud cover: sunny days attract more people (0% clouds = +10, 100% = 0)
-  const sunnyBonus = Math.round((1 - cloudCover / 100) * 10);
-  crowdScore += sunnyBonus;
-
-  return Math.max(0, Math.min(100, crowdScore));
+/** Is the field open during the hour slot starting at unix time `dt`? */
+export const isOpenAt = (dt: number): boolean => {
+  const p = berlinParts(dt);
+  const hours = OPENING_HOURS_CONFIG.months[p.month] ?? { open: 7, close: 18 };
+  return p.hour >= hours.open && p.hour < hours.close;
 };
 
-// ============================================================================
-// Scoring Functions
-// ============================================================================
+/** Generic continuous penalty used by most factors. */
+export const powerPenalty = (value: number, config: PowerPenaltyConfig): number => {
+  if (!(value > config.threshold)) return 0;
+  const excess = (value - config.threshold) / config.range;
+  return Math.min(config.maxPenalty, Math.pow(excess, config.exponent) * config.maxPenalty);
+};
+
+/** Same curve for values *below* the threshold (cold). */
+export const penaltyBelow = (value: number, config: PowerPenaltyConfig): number => {
+  if (!(value < config.threshold)) return 0;
+  const deficit = (config.threshold - value) / config.range;
+  return Math.min(config.maxPenalty, Math.pow(deficit, config.exponent) * config.maxPenalty);
+};
+
+const rampPenalty = (distance: number, config: RampConfig): number => {
+  if (!(distance > 0)) return 0;
+  return Math.min(config.maxPenalty, Math.pow(distance / config.range, config.exponent) * config.maxPenalty);
+};
 
 /**
- * Calculate continuous rain penalty based on probability and intensity.
+ * Continuous rain penalty based on probability and intensity.
  * Every percentage of rain probability contributes to the penalty.
- * Actual precipitation amount adds an intensity bonus on top.
+ * Actual precipitation amount adds an intensity penalty on top.
  */
-const calculateRainPenalty = (pop: number, precipitationMm: number, config: RainConfig): number => {
+export const calculateRainPenalty = (pop: number, precipitationMm: number, config: RainConfig): number => {
   if (pop <= 0) return 0;
 
   // Probability-based penalty: continuous from 0% to 100%
   const probPenalty = Math.pow(Math.min(1, pop), config.exponent) * config.maxPenalty;
 
-  // Intensity bonus: actual precipitation amount increases severity
+  // Intensity penalty: actual precipitation amount increases severity
   let intensityPenalty = 0;
   if (precipitationMm > 0) {
     intensityPenalty = Math.min(config.intensityMax,
@@ -287,272 +243,195 @@ const calculateRainPenalty = (pop: number, precipitationMm: number, config: Rain
   return probPenalty + intensityPenalty;
 };
 
-export const calculateCyclingScore = (hourData: HourData): number => {
-  let score = 100;
-  const date = new Date(hourData.dt * 1000);
-  const hour = date.getHours();
-  const dayOfWeek = date.getDay();
-  const month = date.getMonth();
-  const config = SCORING_CONFIG.cycling;
+/**
+ * Map European AQI (0-100+) onto the 1-5 level scale the configs use:
+ * 0-20 good -> 1, 40 fair -> 2, 60 moderate -> 3, 80 poor -> 4, 100 very poor -> 5.
+ */
+export const aqiLevel = (europeanAqi: number): number => 1 + Math.max(0, europeanAqi - 20) / 20;
 
-  if (!isOpen(hour, date)) return 0;
-
-  // Thunderstorm penalty - CRITICAL (exposed area)
-  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
-    return 0; // Absolutely not safe
-  }
-
-  // Rain penalty - fully continuous based on probability + intensity
-  const precipMm = hourData.rain?.['1h'] ?? 0;
-  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
-
-  // Wind penalty
-  const windSpeed = hourData.wind_speed;
-  if (windSpeed > config.wind.threshold) {
-    const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
-    score -= Math.min(config.wind.maxPenalty, windPenalty);
-  }
-
-  // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
-  score -= (crowdFactor * config.crowd.multiplier);
-
-  // Temperature penalties
-  const temp = hourData.temp;
-
-  // Cold penalty
-  if (temp < config.cold.threshold) {
-    const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-    score -= Math.min(config.cold.maxPenalty, coldPenalty);
-  }
-
-  // Heat penalty
-  if (temp > config.heat.threshold) {
-    const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
-    score -= Math.min(config.heat.maxPenalty, hotPenalty);
-  }
-
-  // Air Quality penalty
-  if (hourData.air_quality && hourData.air_quality.aqi) {
-    const aqi = hourData.air_quality.aqi;
-    if (aqi > config.airQuality.threshold) {
-      const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-      score -= aqiPenalty;
-    }
-  }
-
-  // UV Index penalty
-  if (hourData.uvi !== undefined) {
-    const uvi = hourData.uvi;
-    if (uvi > config.uv.threshold) {
-      const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-      score -= Math.min(config.uv.maxPenalty, uvPenalty);
-    }
-  }
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+export const aqiCategory = (europeanAqi: number): string => {
+  if (europeanAqi < 20) return 'good';
+  if (europeanAqi < 40) return 'fair';
+  if (europeanAqi < 60) return 'moderate';
+  if (europeanAqi < 80) return 'poor';
+  if (europeanAqi < 100) return 'very poor';
+  return 'extremely poor';
 };
 
-export const calculateJoggingScore = (hourData: HourData): number => {
-  let score = 100;
-  const date = new Date(hourData.dt * 1000);
-  const hour = date.getHours();
-  const dayOfWeek = date.getDay();
-  const month = date.getMonth();
-  const config = SCORING_CONFIG.jogging;
-
-  if (!isOpen(hour, date)) return 0;
-
-  // Thunderstorm penalty - CRITICAL (exposed area)
-  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
-    return 0; // Absolutely not safe
-  }
-
-  // Rain penalty - fully continuous based on probability + intensity
-  const precipMm = hourData.rain?.['1h'] ?? 0;
-  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
-
-  // Wind penalty
-  const windSpeed = hourData.wind_speed;
-  if (windSpeed > config.wind.threshold) {
-    const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
-    score -= Math.min(config.wind.maxPenalty, windPenalty);
-  }
-
-  // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
-  score -= (crowdFactor * config.crowd.multiplier);
-
-  // Temperature penalties
-  const temp = hourData.temp;
-
-  // Cold penalty
-  if (temp < config.cold.threshold) {
-    const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-    score -= Math.min(config.cold.maxPenalty, coldPenalty);
-  }
-
-  // Heat penalty
-  if (temp > config.heat.threshold) {
-    const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
-    score -= Math.min(config.heat.maxPenalty, hotPenalty);
-  }
-
-  // Air Quality penalty
-  if (hourData.air_quality && hourData.air_quality.aqi) {
-    const aqi = hourData.air_quality.aqi;
-    if (aqi > config.airQuality.threshold) {
-      const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-      score -= aqiPenalty;
-    }
-  }
-
-  // UV Index penalty
-  if (hourData.uvi !== undefined) {
-    const uvi = hourData.uvi;
-    if (uvi > config.uv.threshold) {
-      const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-      score -= Math.min(config.uv.maxPenalty, uvPenalty);
-    }
-  }
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+/** Kiting wind penalty (continuous): too light, workable, too strong. */
+export const kitingWindPenalty = (windSpeed: number, config: KitingWindConfig): number => {
+  if (windSpeed < config.workableMin) return rampPenalty(config.workableMin - windSpeed, config.tooLight);
+  if (windSpeed > config.workableMax) return rampPenalty(windSpeed - config.workableMax, config.tooStrong);
+  return 0;
 };
 
-export const calculateKitingScore = (hourData: HourData): number => {
-  let score = 100;
-  const date = new Date(hourData.dt * 1000);
-  const hour = date.getHours();
-  const dayOfWeek = date.getDay();
-  const month = date.getMonth();
-  const config = SCORING_CONFIG.kiting;
+const isKitingWind = (wind: StandardWindConfig | KitingWindConfig): wind is KitingWindConfig =>
+  'workableMin' in wind;
 
-  if (!isOpen(hour, date)) return 0;
+const round1 = (x: number): number => Math.round(x * 10) / 10;
 
-  // Thunderstorm penalty - EXTREMELY CRITICAL for kiting (metal frame + lightning)
-  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
-    return 0; // Deadly combination
-  }
-
-  // Wind - CRITICAL for kiting! Need wind but not too much
-  const windSpeed = hourData.wind_speed;
-  const w = config.wind;
-  if (windSpeed < w.tooLightThreshold) {
-    // < 5 m/s: Too light, insufficient power
-    score += w.tooLightPenalty;
-  } else if (windSpeed >= w.workableMin && windSpeed <= w.workableMax) {
-    // 5-11 m/s: Workable range (no penalty, this is good!)
-    // No adjustment needed - this is the ideal range
-  } else if (windSpeed > w.dangerousMin && windSpeed <= w.dangerousMax) {
-    // 11-13 m/s: Getting dangerous
-    score += w.dangerousPenalty;
-  } else if (windSpeed > w.veryDangerousThreshold) {
-    // > 13 m/s: Very dangerous
-    score += w.veryDangerousPenalty;
-  }
-
-  // Rain penalty - fully continuous based on probability + intensity
-  const precipMm = hourData.rain?.['1h'] ?? 0;
-  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
-
-  // Crowd penalty
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
-  score -= (crowdFactor * config.crowd.multiplier);
-
-  // Temperature penalties
-  const temp = hourData.temp;
-
-  // Cold penalty
-  if (temp < config.cold.threshold) {
-    const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-    score -= Math.min(config.cold.maxPenalty, coldPenalty);
-  } else if (temp > config.heat.threshold) {
-    score += config.heat.flatPenalty;
-  }
-
-  // Air Quality penalty
-  if (hourData.air_quality && hourData.air_quality.aqi) {
-    const aqi = hourData.air_quality.aqi;
-    if (aqi > config.airQuality.threshold) {
-      const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-      score -= aqiPenalty;
-    }
-  }
-
-  // UV Index penalty
-  if (hourData.uvi !== undefined) {
-    const uvi = hourData.uvi;
-    if (uvi > config.uv.threshold) {
-      const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-      score -= Math.min(config.uv.maxPenalty, uvPenalty);
-    }
-  }
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+const isDaylight = (dt: number): boolean => {
+  const p = berlinParts(dt);
+  const { sunrise, sunset } = getSunTimes(p.year, p.month, p.day);
+  const mid = p.hour + 0.5;
+  return mid > sunrise && mid < sunset;
 };
 
-export const calculateSocializingScore = (hourData: HourData): number => {
-  let score = 100;
-  const date = new Date(hourData.dt * 1000);
-  const hour = date.getHours();
-  const dayOfWeek = date.getDay();
-  const month = date.getMonth();
-  const config = SCORING_CONFIG.socializing;
+export const hasThunderstorm = (hourData: HourData): boolean =>
+  hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm';
 
-  if (!isOpen(hour, date)) return 0;
+// ============================================================================
+// Scoring Engine
+// ============================================================================
 
-  // Thunderstorm penalty - ruins everything
-  if (hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm') {
-    return 0; // Pack up and go home
-  }
+export const scoreHour = (activity: Activity, hourData: HourData): ScoreBreakdown => {
+  const crowd = estimateCrowd(hourData);
 
-  // Rain penalty - fully continuous based on probability + intensity
+  if (!isOpenAt(hourData.dt)) return { score: 0, status: 'closed', penalties: [], crowd };
+
+  // Thunderstorm - exposed open field, no shelter: never safe
+  if (hasThunderstorm(hourData)) return { score: 0, status: 'thunderstorm', penalties: [], crowd };
+
+  const config: StandardActivityConfig | KitingActivityConfig = SCORING_CONFIG[activity];
+  const penalties: Penalty[] = [];
+  const add = (factor: PenaltyFactor, label: string, detail: string, points: number): void => {
+    if (points > 0.05) penalties.push({ factor, label, detail, points: round1(points) });
+  };
+
+  // Rain - fully continuous based on probability + intensity
   const precipMm = hourData.rain?.['1h'] ?? 0;
-  score -= calculateRainPenalty(hourData.pop, precipMm, config.rain);
+  add('rain', 'Rain', `${Math.round(hourData.pop * 100)}% chance${precipMm > 0 ? `, ${precipMm.toFixed(1)} mm` : ''}`,
+    calculateRainPenalty(hourData.pop, precipMm, config.rain));
 
-  // Wind penalty
+  // Wind
   const windSpeed = hourData.wind_speed;
-  if (windSpeed > config.wind.threshold) {
-    const windPenalty = Math.pow((windSpeed - config.wind.threshold) / config.wind.range, config.wind.exponent) * config.wind.maxPenalty;
-    score -= Math.min(config.wind.maxPenalty, windPenalty);
+  if (isKitingWind(config.wind)) {
+    const w = config.wind;
+    const label = windSpeed < w.workableMin ? 'Too little wind' : 'Too much wind';
+    add('wind', label, `${windSpeed.toFixed(1)} m/s (needs ${w.workableMin}-${w.workableMax})`, kitingWindPenalty(windSpeed, w));
+    const gust = hourData.wind_gust ?? windSpeed;
+    add('gusts', 'Gusty', `gusts ${Math.round(gust)} m/s vs ${Math.round(windSpeed)} mean`,
+      powerPenalty(gust - windSpeed, w.gustiness));
+  } else {
+    add('wind', 'Wind', `${windSpeed.toFixed(1)} m/s`, powerPenalty(windSpeed, config.wind));
   }
 
-  // Crowd penalty (mild for socializing - crowds less of an issue)
-  const crowdFactor = calculateCrowdFactor(hour, dayOfWeek, month, hourData.temp, hourData.pop, hourData.clouds ?? 50);
-  score -= (crowdFactor * config.crowd.multiplier);
+  // Crowds
+  add('crowd', 'Crowds', `${crowd.level} (${crowd.index}/100)`, crowd.index * config.crowd.multiplier);
 
-  // Temperature penalties
+  // Temperature
   const temp = hourData.temp;
+  add('cold', 'Cold', `${Math.round(temp)}°C`, penaltyBelow(temp, config.cold));
+  add('heat', 'Heat', `${Math.round(temp)}°C`, powerPenalty(temp, config.heat));
 
-  // Cold penalty
-  if (temp < config.cold.threshold) {
-    const coldPenalty = Math.pow((config.cold.threshold - temp) / config.cold.range, config.cold.exponent) * config.cold.maxPenalty;
-    score -= Math.min(config.cold.maxPenalty, coldPenalty);
+  // Air quality (real European AQI when available)
+  const eaqi = hourData.air_quality?.european_aqi;
+  if (eaqi !== undefined && eaqi !== null) {
+    add('airQuality', 'Air quality', `EAQI ${Math.round(eaqi)} (${aqiCategory(eaqi)})`,
+      powerPenalty(aqiLevel(eaqi), config.airQuality));
   }
 
-  // Heat penalty
-  if (temp > config.heat.threshold) {
-    const hotPenalty = Math.pow((temp - config.heat.threshold) / config.heat.range, config.heat.exponent) * config.heat.maxPenalty;
-    score -= Math.min(config.heat.maxPenalty, hotPenalty);
-  }
-
-  // Air Quality penalty
-  if (hourData.air_quality && hourData.air_quality.aqi) {
-    const aqi = hourData.air_quality.aqi;
-    if (aqi > config.airQuality.threshold) {
-      const aqiPenalty = Math.pow((aqi - config.airQuality.threshold) / config.airQuality.range, config.airQuality.exponent) * config.airQuality.maxPenalty;
-      score -= aqiPenalty;
-    }
-  }
-
-  // UV Index penalty
+  // UV index
   if (hourData.uvi !== undefined) {
-    const uvi = hourData.uvi;
-    if (uvi > config.uv.threshold) {
-      const uvPenalty = Math.pow((uvi - config.uv.threshold) / config.uv.range, config.uv.exponent) * config.uv.maxPenalty;
-      score -= Math.min(config.uv.maxPenalty, uvPenalty);
-    }
+    add('uv', 'UV', `UV ${hourData.uvi.toFixed(1)}`, powerPenalty(hourData.uvi, config.uv));
   }
 
-  return Math.max(0, Math.min(100, Math.round(score)));
+  // Overcast (daylight only)
+  if (config.overcast && hourData.clouds !== undefined && isDaylight(hourData.dt)) {
+    add('overcast', 'No sun', `${Math.round(hourData.clouds)}% cloud cover`, powerPenalty(hourData.clouds, config.overcast));
+  }
+
+  penalties.sort((a, b) => b.points - a.points);
+  const total = penalties.reduce((sum, p) => sum + p.points, 0);
+  const score = Math.max(0, Math.min(100, Math.round(100 - total)));
+  return { score, status: 'open', penalties, crowd };
+};
+
+export const calculateScore = (activity: Activity, hourData: HourData): number => scoreHour(activity, hourData).score;
+
+export const calculateCyclingScore = (hourData: HourData): number => calculateScore('cycling', hourData);
+export const calculateJoggingScore = (hourData: HourData): number => calculateScore('jogging', hourData);
+export const calculateKitingScore = (hourData: HourData): number => calculateScore('kiting', hourData);
+export const calculateSocializingScore = (hourData: HourData): number => calculateScore('socializing', hourData);
+
+// ============================================================================
+// Explanations (generated from SCORING_CONFIG so they can't drift)
+// ============================================================================
+
+export interface FactorExplanation {
+  title: string;
+  rule: string;
+  examples: string;
+}
+
+const fmt = (points: number): string => (points < 0.5 ? '0' : `-${Math.round(points)}`);
+
+export const explainActivity = (activity: Activity): FactorExplanation[] => {
+  const c: StandardActivityConfig | KitingActivityConfig = SCORING_CONFIG[activity];
+  const rows: FactorExplanation[] = [
+    { title: 'Thunderstorm', rule: 'Score = 0', examples: 'No shelter on the open field' },
+    {
+      title: 'Rain',
+      rule: `By probability up to -${c.rain.maxPenalty}, plus up to -${c.rain.intensityMax} for intensity`,
+      examples: [0.2, 0.5, 0.8].map(p => `${p * 100}% = ${fmt(calculateRainPenalty(p, 0, c.rain))}`).join(', '),
+    },
+  ];
+
+  if (isKitingWind(c.wind)) {
+    const w = c.wind;
+    rows.push({
+      title: 'Wind',
+      rule: `Needs ${w.workableMin}-${w.workableMax} m/s; too little or too much costs up to -${w.tooLight.maxPenalty}`,
+      examples: [2, 4, 8, 12, 14].map(s => `${s} m/s = ${fmt(kitingWindPenalty(s, w))}`).join(', '),
+    });
+    rows.push({
+      title: 'Gusts',
+      rule: `Gusts more than ${w.gustiness.threshold} m/s above the mean wind (max -${w.gustiness.maxPenalty})`,
+      examples: [7, 9, 13].map(d => `+${d} m/s = ${fmt(powerPenalty(d, w.gustiness))}`).join(', '),
+    });
+  } else {
+    const w = c.wind;
+    rows.push({
+      title: 'Wind',
+      rule: `From ${w.threshold} m/s (max -${w.maxPenalty})`,
+      examples: [5, 7, 10].map(s => `${s} m/s = ${fmt(powerPenalty(s, w))}`).join(', '),
+    });
+  }
+
+  rows.push({
+    title: 'Crowds',
+    rule: `${c.crowd.multiplier} x crowd index (max -${Math.round(100 * c.crowd.multiplier)})`,
+    examples: 'Index 100 = sunny summer Sunday afternoon',
+  });
+  rows.push({
+    title: 'Cold',
+    rule: `Below ${c.cold.threshold}°C (max -${c.cold.maxPenalty})`,
+    examples: [c.cold.threshold - 4, c.cold.threshold - 8, 0]
+      .map(t => `${t}°C = ${fmt(penaltyBelow(t, c.cold))}`).join(', '),
+  });
+  rows.push({
+    title: 'Heat',
+    rule: `Above ${c.heat.threshold}°C (max -${c.heat.maxPenalty})`,
+    examples: [c.heat.threshold + 3, c.heat.threshold + 6, c.heat.threshold + 9]
+      .map(t => `${t}°C = ${fmt(powerPenalty(t, c.heat))}`).join(', '),
+  });
+  rows.push({
+    title: 'UV',
+    rule: `Above UV ${c.uv.threshold} (max -${c.uv.maxPenalty})`,
+    examples: [5, 7].map(u => `UV ${u} = ${fmt(powerPenalty(u, c.uv))}`).join(', '),
+  });
+  rows.push({
+    title: 'Air quality',
+    rule: `European AQI (max -${c.airQuality.maxPenalty})`,
+    examples: [30, 50, 70].map(a => `${a} (${aqiCategory(a)}) = ${fmt(powerPenalty(aqiLevel(a), c.airQuality))}`).join(', '),
+  });
+  if (c.overcast) {
+    const o = c.overcast;
+    rows.push({
+      title: 'No sun',
+      rule: `Cloud cover above ${o.threshold}% in daylight (max -${o.maxPenalty})`,
+      examples: [70, 100].map(cc => `${cc}% = ${fmt(powerPenalty(cc, o))}`).join(', '),
+    });
+  }
+  return rows;
 };
