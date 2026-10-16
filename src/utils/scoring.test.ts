@@ -4,12 +4,18 @@ import {
   OPENING_HOURS_CONFIG,
   getOpeningHours,
   isOpen,
-  calculateCrowdFactor,
+  isOpenAt,
+  scoreHour,
+  explainActivity,
+  aqiLevel,
+  kitingWindPenalty,
   calculateCyclingScore,
   calculateJoggingScore,
   calculateKitingScore,
   calculateSocializingScore,
 } from './scoring';
+import { berlinToUnix } from './time';
+import type { Activity, HourData } from './types';
 
 describe('Opening Hours Logic', () => {
   describe('OPENING_HOURS_CONFIG', () => {
@@ -49,7 +55,7 @@ describe('Opening Hours Logic', () => {
     });
 
     it('should return October hours (7-19)', () => {
-      const date = new Date(2024, 9, 1); // October 1
+      const date = new Date(berlinToUnix(2024, 9, 1) * 1000); // October 1, 00:00 Berlin
       const hours = getOpeningHours(date);
       expect(hours).toEqual({ open: 7, close: 19 });
     });
@@ -110,65 +116,16 @@ describe('Opening Hours Logic', () => {
   });
 });
 
-describe('Crowd Factor Calculation', () => {
-  // New signature: (hour, dayOfWeek, month, temp, pop, cloudCover)
-  it('should return higher crowd score on weekends', () => {
-    const weekday = calculateCrowdFactor(14, 3, 5, 20, 0.1, 30); // Wednesday, June
-    const weekend = calculateCrowdFactor(14, 6, 5, 20, 0.1, 30); // Saturday, June
-    expect(weekend).toBeGreaterThan(weekday);
-  });
-
-  it('should return higher crowd score during peak hours (11-18)', () => {
-    const morning = calculateCrowdFactor(9, 3, 5, 20, 0.1, 30);
-    const peak = calculateCrowdFactor(14, 3, 5, 20, 0.1, 30);
-    expect(peak).toBeGreaterThan(morning);
-  });
-
-  it('should return higher crowd score in summer months', () => {
-    const winter = calculateCrowdFactor(14, 6, 0, 20, 0.1, 30); // January
-    const summer = calculateCrowdFactor(14, 6, 6, 20, 0.1, 30); // July
-    expect(summer).toBeGreaterThan(winter);
-  });
-
-  it('should return higher crowd score at ideal temperature (~22°C)', () => {
-    const cold = calculateCrowdFactor(14, 6, 5, 5, 0.1, 30);
-    const ideal = calculateCrowdFactor(14, 6, 5, 22, 0.1, 30);
-    expect(ideal).toBeGreaterThan(cold);
-  });
-
-  it('should return lower crowd score with high rain probability', () => {
-    const dry = calculateCrowdFactor(14, 6, 5, 20, 0.1, 30);
-    const rainy = calculateCrowdFactor(14, 6, 5, 20, 0.9, 30);
-    expect(rainy).toBeLessThan(dry);
-  });
-
-  it('should return higher crowd score on sunny days (low cloud cover)', () => {
-    const sunny = calculateCrowdFactor(14, 6, 5, 20, 0.1, 10);
-    const cloudy = calculateCrowdFactor(14, 6, 5, 20, 0.1, 90);
-    expect(sunny).toBeGreaterThan(cloudy);
-  });
-
-  it('should never return negative crowd score', () => {
-    const score = calculateCrowdFactor(3, 2, 0, 1, 1.0, 100); // Bad conditions
-    expect(score).toBeGreaterThanOrEqual(0);
-  });
-
-  it('should never exceed 100', () => {
-    const score = calculateCrowdFactor(14, 6, 6, 22, 0.0, 0); // Perfect conditions
-    expect(score).toBeLessThanOrEqual(100);
-  });
-});
-
 describe('Cycling Score', () => {
   const createMockHourData = (overrides = {}) => ({
-    dt: new Date(2024, 5, 15, 14, 0).getTime() / 1000, // June 15, 2:00 PM
+    dt: berlinToUnix(2024, 5, 15, 14), // June 15, 2:00 PM
     temp: 20,
     wind_speed: 2,
     pop: 0.1,
     uvi: 3,
     clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
-    air_quality: { aqi: 1 },
+    air_quality: { european_aqi: 10 },
     hasThunderstorm: false,
     ...overrides,
   });
@@ -187,7 +144,7 @@ describe('Cycling Score', () => {
 
   it('should return 0 for closed hours', () => {
     const hourData = createMockHourData({
-      dt: new Date(2024, 5, 15, 5, 0).getTime() / 1000, // 5:00 AM (closed)
+      dt: berlinToUnix(2024, 5, 15, 5), // 5:00 AM (closed)
     });
     const score = calculateCyclingScore(hourData);
     expect(score).toBe(0);
@@ -247,8 +204,8 @@ describe('Cycling Score', () => {
   });
 
   it('should penalize poor air quality', () => {
-    const normal = calculateCyclingScore(createMockHourData({ air_quality: { aqi: 1 } }));
-    const poorAir = calculateCyclingScore(createMockHourData({ air_quality: { aqi: 5 } }));
+    const normal = calculateCyclingScore(createMockHourData({ air_quality: { european_aqi: 10 } }));
+    const poorAir = calculateCyclingScore(createMockHourData({ air_quality: { european_aqi: 90 } }));
     expect(poorAir).toBeLessThan(normal);
   });
 
@@ -264,7 +221,7 @@ describe('Cycling Score', () => {
       wind_speed: 20,
       pop: 1.0,
       uvi: 11,
-      air_quality: { aqi: 5 },
+      air_quality: { european_aqi: 90 },
       rain: { '1h': 10 },
       weather: [{ main: 'Rain', description: 'heavy rain' }],
     });
@@ -280,14 +237,14 @@ describe('Cycling Score', () => {
 
 describe('Jogging Score', () => {
   const createMockHourData = (overrides = {}) => ({
-    dt: new Date(2024, 5, 15, 14, 0).getTime() / 1000,
+    dt: berlinToUnix(2024, 5, 15, 14),
     temp: 15,
     wind_speed: 2,
     pop: 0.1,
     uvi: 3,
     clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
-    air_quality: { aqi: 1 },
+    air_quality: { european_aqi: 10 },
     hasThunderstorm: false,
     ...overrides,
   });
@@ -315,7 +272,7 @@ describe('Jogging Score', () => {
     // Use weekday off-peak to isolate heat penalty from crowd effects
     const hotData = createMockHourData({
       temp: 30,
-      dt: new Date(2024, 5, 12, 8, 0).getTime() / 1000, // Wednesday 8AM
+      dt: berlinToUnix(2024, 5, 12, 8), // Wednesday 8AM
     });
     const cyclingScore = calculateCyclingScore(hotData);
     const joggingScore = calculateJoggingScore(hotData);
@@ -357,14 +314,14 @@ describe('Jogging Score', () => {
 
 describe('Kiting Score', () => {
   const createMockHourData = (overrides = {}) => ({
-    dt: new Date(2024, 5, 15, 14, 0).getTime() / 1000,
+    dt: berlinToUnix(2024, 5, 15, 14),
     temp: 18,
     wind_speed: 8, // Ideal for kiting
     pop: 0.1,
     uvi: 4,
     clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
-    air_quality: { aqi: 1 },
+    air_quality: { european_aqi: 10 },
     hasThunderstorm: false,
     ...overrides,
   });
@@ -373,7 +330,7 @@ describe('Kiting Score', () => {
     // Use weekday off-peak to reduce crowd penalty (kiting has highest crowd multiplier)
     const hourData = createMockHourData({
       wind_speed: 8,
-      dt: new Date(2024, 5, 12, 8, 0).getTime() / 1000, // Wednesday 8AM
+      dt: berlinToUnix(2024, 5, 12, 8), // Wednesday 8AM
     });
     const score = calculateKitingScore(hourData);
     expect(score).toBeGreaterThan(70);
@@ -419,9 +376,12 @@ describe('Kiting Score', () => {
     expect(cold).toBeLessThan(normal);
   });
 
-  it('should apply flat penalty for extreme heat (> 30°C)', () => {
-    expect(SCORING_CONFIG.kiting.heat.flatPenalty).toBe(-10);
-    expect(SCORING_CONFIG.kiting.heat.threshold).toBe(30);
+  it('should penalize extreme heat continuously (no step at 30°C)', () => {
+    const at29 = calculateKitingScore(createMockHourData({ temp: 29.9 }));
+    const at31 = calculateKitingScore(createMockHourData({ temp: 30.1 }));
+    const at36 = calculateKitingScore(createMockHourData({ temp: 36 }));
+    expect(at29 - at31).toBeLessThanOrEqual(1);
+    expect(at36).toBeLessThan(at29);
   });
 
   it('should have highest crowd penalty multiplier', () => {
@@ -438,14 +398,14 @@ describe('Kiting Score', () => {
 
 describe('Socializing Score', () => {
   const createMockHourData = (overrides = {}) => ({
-    dt: new Date(2024, 5, 15, 14, 0).getTime() / 1000,
+    dt: berlinToUnix(2024, 5, 15, 14),
     temp: 22,
     wind_speed: 2,
     pop: 0.05,
     uvi: 3,
     clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
-    air_quality: { aqi: 1 },
+    air_quality: { european_aqi: 10 },
     hasThunderstorm: false,
     ...overrides,
   });
@@ -522,14 +482,14 @@ describe('Socializing Score', () => {
 
 describe('Edge Cases and Bounds', () => {
   const createMockHourData = (overrides = {}) => ({
-    dt: new Date(2024, 5, 15, 14, 0).getTime() / 1000,
+    dt: berlinToUnix(2024, 5, 15, 14),
     temp: 20,
     wind_speed: 5,
     pop: 0.1,
     uvi: 3,
     clouds: 30,
     weather: [{ main: 'Clear', description: 'clear sky' }],
-    air_quality: { aqi: 1 },
+    air_quality: { european_aqi: 10 },
     hasThunderstorm: false,
     ...overrides,
   });
@@ -576,7 +536,7 @@ describe('Edge Cases and Bounds', () => {
       wind_speed: 25,
       pop: 1.0,
       uvi: 15,
-      air_quality: { aqi: 5 },
+      air_quality: { european_aqi: 90 },
       rain: { '1h': 10 },
       weather: [{ main: 'Rain', description: 'heavy rain' }],
     });
@@ -600,7 +560,7 @@ describe('Edge Cases and Bounds', () => {
       wind_speed: 0,
       pop: 0,
       uvi: 0,
-      air_quality: { aqi: 1 },
+      air_quality: { european_aqi: 10 },
     });
 
     const scores = [
@@ -627,5 +587,159 @@ describe('Edge Cases and Bounds', () => {
     const probOnly = createMockHourData({ pop: 0.6 });
     const withIntensity = createMockHourData({ pop: 0.6, rain: { '1h': 5.0 } });
     expect(calculateCyclingScore(withIntensity)).toBeLessThan(calculateCyclingScore(probOnly));
+  });
+});
+
+// ============================================================================
+// Behaviour added with the scoring engine refactor
+// ============================================================================
+
+const ACTIVITIES: Activity[] = ['cycling', 'jogging', 'kiting', 'socializing'];
+
+const hour = (overrides: Partial<HourData> = {}): HourData => ({
+  dt: berlinToUnix(2026, 5, 16, 10), // Tuesday June 16, 10:00 Berlin (quiet field)
+  temp: 20,
+  wind_speed: 2,
+  wind_gust: 4,
+  pop: 0,
+  uvi: 2,
+  clouds: 20,
+  weather: [{ main: 'Clear', description: 'clear sky' }],
+  air_quality: { european_aqi: 10 },
+  hasThunderstorm: false,
+  ...overrides,
+});
+
+describe('Score breakdown', () => {
+  it('score equals 100 minus the listed penalties (within rounding)', () => {
+    for (const activity of ACTIVITIES) {
+      const b = scoreHour(activity, hour({ pop: 0.4, wind_speed: 7, temp: 9, uvi: 6, clouds: 90 }));
+      const total = b.penalties.reduce((s, p) => s + p.points, 0);
+      expect(Math.abs(b.score - (100 - total))).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  it('lists penalties largest first and only non-zero ones', () => {
+    const b = scoreHour('cycling', hour({ pop: 0.8, wind_speed: 6 }));
+    expect(b.penalties.length).toBeGreaterThan(0);
+    for (let i = 1; i < b.penalties.length; i++) {
+      expect(b.penalties[i - 1]!.points).toBeGreaterThanOrEqual(b.penalties[i]!.points);
+    }
+    expect(b.penalties.every(p => p.points > 0)).toBe(true);
+    expect(b.penalties[0]!.factor).toBe('rain');
+  });
+
+  it('reports closed and thunderstorm status with no penalties', () => {
+    expect(scoreHour('cycling', hour({ dt: berlinToUnix(2026, 5, 16, 3) })).status).toBe('closed');
+    const storm = scoreHour('cycling', hour({ hasThunderstorm: true }));
+    expect(storm.status).toBe('thunderstorm');
+    expect(storm.score).toBe(0);
+    expect(storm.penalties).toEqual([]);
+  });
+
+  it('a perfect quiet hour scores (close to) 100 for every activity', () => {
+    for (const activity of ACTIVITIES) {
+      const ideal = hour({ wind_speed: activity === 'kiting' ? 8 : 1, wind_gust: activity === 'kiting' ? 11 : 2 });
+      expect(scoreHour(activity, ideal).score).toBeGreaterThanOrEqual(95);
+    }
+  });
+});
+
+describe('Timezone independence', () => {
+  it('uses Berlin opening hours regardless of the machine timezone', () => {
+    // 05:00 Berlin in June is closed, 06:00 is open - in UTC those are 03:00/04:00.
+    expect(isOpenAt(berlinToUnix(2026, 5, 16, 5))).toBe(false);
+    expect(isOpenAt(berlinToUnix(2026, 5, 16, 6))).toBe(true);
+    expect(isOpenAt(berlinToUnix(2026, 5, 16, 22))).toBe(true);
+    expect(isOpenAt(berlinToUnix(2026, 5, 16, 23))).toBe(false);
+  });
+});
+
+describe('Kiting wind (continuous)', () => {
+  const w = SCORING_CONFIG.kiting.wind;
+
+  it('has no cliff at the edges of the workable range', () => {
+    expect(kitingWindPenalty(4.9, w) - kitingWindPenalty(5, w)).toBeLessThan(2);
+    expect(kitingWindPenalty(11.1, w) - kitingWindPenalty(11, w)).toBeLessThan(2);
+  });
+
+  it('is unkiteable without wind and in a gale (score 0)', () => {
+    expect(calculateKitingScore(hour({ wind_speed: 0, wind_gust: 0 }))).toBe(0);
+    expect(calculateKitingScore(hour({ wind_speed: 20, wind_gust: 28 }))).toBe(0);
+  });
+
+  it('gets monotonically worse moving away from the workable range', () => {
+    const light = [5, 4, 3, 2, 1].map(s => kitingWindPenalty(s, w));
+    const strong = [11, 12, 13, 14, 15].map(s => kitingWindPenalty(s, w));
+    for (let i = 1; i < 5; i++) {
+      expect(light[i]).toBeGreaterThan(light[i - 1]!);
+      expect(strong[i]).toBeGreaterThan(strong[i - 1]!);
+    }
+  });
+
+  it('penalizes gusty wind even when the mean is ideal', () => {
+    const steady = calculateKitingScore(hour({ wind_speed: 8, wind_gust: 11 }));
+    const gusty = calculateKitingScore(hour({ wind_speed: 8, wind_gust: 20 }));
+    expect(gusty).toBeLessThan(steady - 20);
+  });
+});
+
+describe('Picnic sunshine', () => {
+  it('a sunny afternoon beats an overcast one with otherwise equal weather', () => {
+    const saturday = berlinToUnix(2026, 5, 13, 15);
+    const sunny = calculateSocializingScore(hour({ dt: saturday, temp: 24, clouds: 0, uvi: 6 }));
+    const grey = calculateSocializingScore(hour({ dt: saturday, temp: 24, clouds: 100, uvi: 2 }));
+    expect(sunny).toBeGreaterThan(grey);
+  });
+
+  it('does not apply the overcast penalty after sunset', () => {
+    // Oct 16 2026: sunset ~18:12; 18:00 slot midpoint is after sunset
+    const evening = scoreHour('socializing', hour({ dt: berlinToUnix(2026, 9, 16, 18), clouds: 100 }));
+    expect(evening.penalties.some(p => p.factor === 'overcast')).toBe(false);
+  });
+
+  it('only applies the overcast penalty to the picnic activity', () => {
+    for (const activity of ['cycling', 'jogging', 'kiting'] as const) {
+      expect(scoreHour(activity, hour({ clouds: 100 })).penalties.some(p => p.factor === 'overcast')).toBe(false);
+    }
+  });
+});
+
+describe('Air quality (European AQI)', () => {
+  it('maps EAQI bands onto the 1-5 config scale', () => {
+    expect(aqiLevel(0)).toBe(1);
+    expect(aqiLevel(20)).toBe(1);
+    expect(aqiLevel(40)).toBe(2);
+    expect(aqiLevel(60)).toBe(3);
+    expect(aqiLevel(80)).toBe(4);
+  });
+
+  it('applies no penalty in the "good" band and none when data is missing', () => {
+    const good = scoreHour('cycling', hour({ air_quality: { european_aqi: 15 } }));
+    const missing = scoreHour('cycling', hour({ air_quality: undefined }));
+    expect(good.penalties.some(p => p.factor === 'airQuality')).toBe(false);
+    expect(missing.penalties.some(p => p.factor === 'airQuality')).toBe(false);
+  });
+
+  it('caps the penalty at maxPenalty even for extreme pollution', () => {
+    const b = scoreHour('cycling', hour({ air_quality: { european_aqi: 300 } }));
+    const aq = b.penalties.find(p => p.factor === 'airQuality')!;
+    expect(aq.points).toBeLessThanOrEqual(SCORING_CONFIG.cycling.airQuality.maxPenalty);
+  });
+});
+
+describe('explainActivity', () => {
+  it('generates an explanation for every activity from the live config', () => {
+    for (const activity of ACTIVITIES) {
+      const rows = explainActivity(activity);
+      expect(rows.map(r => r.title)).toEqual(expect.arrayContaining(['Thunderstorm', 'Rain', 'Wind', 'Crowds', 'Cold']));
+      expect(rows.every(r => r.rule.length > 0 && r.examples.length > 0)).toBe(true);
+    }
+  });
+
+  it('quotes the same rain numbers the engine applies', () => {
+    const rain = explainActivity('cycling').find(r => r.title === 'Rain')!;
+    const expected = Math.round(Math.pow(0.5, SCORING_CONFIG.cycling.rain.exponent) * SCORING_CONFIG.cycling.rain.maxPenalty);
+    expect(rain.examples).toContain(`50% = -${expected}`);
   });
 });
