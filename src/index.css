@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Theme token (Tailwind config, not custom styling): self-hosted DIN-like signage face */
+@theme {
+  --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

@@ -1,15 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Clock, RefreshCw, Sunset, TriangleAlert } from 'lucide-react';
+import { ChevronDown, RefreshCw, TriangleAlert } from 'lucide-react';
 import { getOpeningHours, scoreHour, type Activity, type HourData } from './utils/scoring';
 import { bestSlotOfDay, findBestSlots, type ScoredHour } from './utils/ranking';
 import { generateMockWeatherData } from './utils/mockData';
 import { getHolidayName, getSunTimes } from './utils/calendar';
-import { berlinParts, formatClock, formatDay, formatDecimalHours, formatHour, startOfBerlinDay } from './utils/time';
-import { ACTIVITIES, ACTIVITY_ACTIVE_CLASSES, ACTIVITY_LABELS } from './utils/display';
-import HourCard from './components/HourCard';
-import DetailModal from './components/DetailModal';
+import { berlinParts, formatClock, formatDay, startOfBerlinDay } from './utils/time';
+import { ACTIVITIES } from './utils/display';
+import { SKY_GRADIENTS, skyPhase } from './utils/sky';
+import Hero from './components/Hero';
 import BestTimes from './components/BestTimes';
+import WeekOutlook from './components/WeekOutlook';
+import DaySection, { type DayGroup } from './components/DaySection';
+import DetailModal from './components/DetailModal';
 import ScoreExplainer from './components/ScoreExplainer';
+import Footer from './components/Footer';
+import Runway from './components/Runway';
 
 // ============================================================================
 // Type Definitions
@@ -28,13 +33,6 @@ export interface APIResponse {
   fetched_at?: string;
   stale?: boolean;
   error?: string;
-}
-
-interface DayGroup {
-  key: string;
-  label: string;
-  holiday: string | null;
-  hours: ScoredHour[];
 }
 
 interface ForecastMeta {
@@ -72,6 +70,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
   const [meta, setMeta] = useState<ForecastMeta>({ fetchedAt: null, stale: false, airQuality: false });
   const [selectedDt, setSelectedDt] = useState<number | null>(null);
   const [showAllDays, setShowAllDays] = useState<boolean>(false);
+  const [scrollTarget, setScrollTarget] = useState<string | null>(null);
   const [nowSeconds, setNowSeconds] = useState<number>(nowInSeconds);
 
   // Keep "now" fresh so past hours grey out and the current hour moves.
@@ -87,6 +86,13 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
       // ignore
     }
   }, [activity]);
+
+  // Scroll after the target day has rendered (it may have just been expanded).
+  useEffect(() => {
+    if (!scrollTarget) return;
+    document.getElementById(`day-${scrollTarget}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setScrollTarget(null);
+  }, [scrollTarget, showAllDays]);
 
   const loadForecast = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -149,7 +155,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
       }
       group.hours.push(hour);
     }
-    return groups;
+    return groups.slice(0, MAX_DAYS);
   }, [scoredHours]);
 
   // Best 2-hour windows from now until the end of the default 4-day view.
@@ -162,185 +168,136 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
     () => findBestSlots(scoredHours, 3, { fromDt: firstBookableHour, untilDt: horizonEnd }),
     [scoredHours, firstBookableHour, horizonEnd]
   );
+  const dayBest = useMemo(
+    () => dayGroups.map(day => bestSlotOfDay(day.hours, { fromDt: firstBookableHour })),
+    [dayGroups, firstBookableHour]
+  );
 
   const selectedHour = selectedDt !== null ? scoredHours.find(h => h.dt === selectedDt) ?? null : null;
   const closeModal = useCallback(() => setSelectedDt(null), []);
   const selectHour = useCallback((hour: ScoredHour) => setSelectedDt(hour.dt), []);
 
+  const today = berlinParts(nowSeconds);
+  const todaySun = getSunTimes(today.year, today.month, today.day);
+  const currentHour = scoredHours.find(h => h.dt <= nowSeconds && nowSeconds < h.dt + 3600) ?? null;
+  const nextOpen = scoredHours.find(h => h.dt >= currentHourStart && h.breakdown.status !== 'closed') ?? null;
+  const sky = skyPhase(today.hour + today.minute / 60, todaySun.sunrise, todaySun.sunset, currentHour?.clouds, currentHour?.pop);
+
   if (!forecastData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        {error ? (
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md text-center">
-            <TriangleAlert className="w-10 h-10 text-amber-500 mx-auto mb-3" />
-            <h1 className="text-lg font-bold text-gray-800 mb-1">Couldn&apos;t load the forecast</h1>
-            <p className="text-sm text-gray-600 mb-4">The weather service is unavailable right now ({error}).</p>
-            <button
-              onClick={() => void loadForecast()}
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Try again
-            </button>
-          </div>
-        ) : (
-          <div className="text-center">
-            <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-            <p className="text-lg text-gray-700">Loading forecast...</p>
-          </div>
-        )}
+      <div className={`min-h-screen flex flex-col items-center justify-center p-4 text-white ${SKY_GRADIENTS[sky]}`}>
+        <div className="w-full max-w-md text-center">
+          <span className="font-display font-bold tracking-[0.2em] bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-sm">THF</span>
+          <h1 className="font-display font-bold uppercase text-5xl mt-4 leading-none">Tempelhofer Feld</h1>
+          {error ? (
+            <div className="mt-6 rounded-3xl bg-black/25 ring-1 ring-white/15 p-6">
+              <TriangleAlert className="w-10 h-10 text-amber-400 mx-auto mb-3" />
+              <p className="font-display text-2xl font-bold uppercase">Couldn&apos;t load the forecast</p>
+              <p className="text-sm text-white/80 mt-1 mb-4">The weather service is unavailable right now ({error}).</p>
+              <button
+                onClick={() => void loadForecast()}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-400 text-slate-900 font-semibold hover:bg-amber-300 disabled:opacity-60 transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Try again
+              </button>
+            </div>
+          ) : (
+            <div className="mt-6 flex items-center justify-center gap-2 text-white/80">
+              <RefreshCw className="w-5 h-5 animate-spin" />
+              <span>Loading forecast…</span>
+            </div>
+          )}
+        </div>
+        <Runway className="w-full max-w-md mt-8 opacity-70" />
       </div>
     );
   }
 
-  const today = berlinParts(nowSeconds);
-  const todayHours = getOpeningHours(new Date(nowSeconds * 1000));
-  const todaySun = getSunTimes(today.year, today.month, today.day);
-  const visibleDays = dayGroups.slice(0, showAllDays ? MAX_DAYS : DEFAULT_DAYS);
-  const hiddenDays = Math.min(MAX_DAYS, dayGroups.length) - DEFAULT_DAYS;
   const tomorrowKey = berlinParts(todayStart + 26 * 3600).dateKey;
+  const relativeLabel = (key: string): string | null =>
+    key === today.dateKey ? 'Today' : key === tomorrowKey ? 'Tomorrow' : null;
+  const visibleDays = dayGroups.slice(0, showAllDays ? MAX_DAYS : DEFAULT_DAYS);
+  const hiddenDays = dayGroups.length - DEFAULT_DAYS;
+
+  const jumpToDay = (key: string, index: number): void => {
+    if (index >= DEFAULT_DAYS) setShowAllDays(true);
+    setScrollTarget(key);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4">
+    <div className="min-h-screen bg-slate-100 px-3 py-3 sm:px-4 sm:py-5">
       {selectedHour && <DetailModal hour={selectedHour} activity={activity} onClose={closeModal} />}
 
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Tempelhofer Feld</h1>
-              <p className="text-gray-600">{ACTIVITY_LABELS[activity]} Forecast - Next 4 Days</p>
-            </div>
-            <button
-              onClick={() => void loadForecast()}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5">
+        <Hero
+          activity={activity}
+          onActivityChange={setActivity}
+          current={currentHour}
+          nextOpen={nextOpen}
+          nowSeconds={nowSeconds}
+          todayHours={getOpeningHours(new Date(nowSeconds * 1000))}
+          sunset={todaySun.sunset}
+          sky={sky}
+          fetchedAt={meta.fetchedAt}
+          showUpdated={!usingMockData}
+          loading={loading}
+          onRefresh={() => void loadForecast()}
+        />
+
+        {usingMockData && (
+          <div className="rounded-2xl bg-yellow-50 ring-1 ring-yellow-200 px-4 py-3 text-sm text-yellow-900">
+            <strong>Mock Data:</strong> Using simulated weather data. Run <code>npm run netlify:dev</code> to see real forecasts.
           </div>
-
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-600">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              Open today {String(todayHours.open).padStart(2, '0')}:00–{String(todayHours.close).padStart(2, '0')}:00
-            </span>
-            <span className="flex items-center gap-1">
-              <Sunset className="w-3.5 h-3.5" />
-              Sunset {formatDecimalHours(todaySun.sunset)}
-            </span>
-            {meta.fetchedAt !== null && !usingMockData && (
-              <span>Updated {formatClock(meta.fetchedAt)}</span>
-            )}
+        )}
+        {meta.stale && (
+          <div className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 px-4 py-3 text-sm text-amber-900">
+            The weather service is unreachable, so this is the last saved forecast
+            {meta.fetchedAt !== null && <> from {formatClock(meta.fetchedAt)}</>}.
           </div>
-
-          {/* Activity Selector */}
-          <div className="mt-6 bg-gray-100 p-1 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-1 max-w-2xl">
-            {ACTIVITIES.map(a => (
-              <button
-                key={a}
-                onClick={() => setActivity(a)}
-                aria-pressed={activity === a}
-                className={`px-4 py-2.5 rounded-lg font-semibold transition-all text-sm md:text-base ${
-                  activity === a ? ACTIVITY_ACTIVE_CLASSES[a] : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {ACTIVITY_LABELS[a]}
-              </button>
-            ))}
+        )}
+        {error && (
+          <div className="rounded-2xl bg-red-50 ring-1 ring-red-200 px-4 py-3 text-sm text-red-800">
+            Refresh failed ({error}). Showing the previous forecast.
           </div>
+        )}
 
-          {usingMockData && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                <strong>Mock Data:</strong> Using simulated weather data. Run <code>npm run netlify:dev</code> to see real forecasts.
-              </p>
-            </div>
-          )}
-          {meta.stale && (
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-sm text-amber-800">
-                The weather service is unreachable, so this is the last saved forecast
-                {meta.fetchedAt !== null && <> from {formatClock(meta.fetchedAt)}</>}.
-              </p>
-            </div>
-          )}
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-800">Refresh failed ({error}). Showing the previous forecast.</p>
-            </div>
-          )}
-        </div>
+        <BestTimes slots={bestSlots} activity={activity} nowSeconds={nowSeconds} onSelect={selectHour} />
 
-        <BestTimes slots={bestSlots} nowSeconds={nowSeconds} onSelect={selectHour} />
+        <WeekOutlook
+          days={dayGroups.map((day, i) => ({ day, best: dayBest[i] ?? null, relativeLabel: relativeLabel(day.key) }))}
+          defaultVisible={DEFAULT_DAYS}
+          onJump={jumpToDay}
+        />
 
         {/* Daily Forecasts - Clean 2-Row Layout */}
-        <div className="space-y-6">
-          {visibleDays.map((day, index) => {
-            // Split hours into two rows
-            const midpoint = Math.ceil(day.hours.length / 2);
-            const morningHours = day.hours.slice(0, midpoint);
-            const afternoonHours = day.hours.slice(midpoint);
-            const best = bestSlotOfDay(day.hours, { fromDt: firstBookableHour });
-            const prefix = index === 0 && day.key === today.dateKey ? 'Today · ' : day.key === tomorrowKey ? 'Tomorrow · ' : '';
-
-            return (
-              <div key={day.key} className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-4">
-                  <h3 className="text-xl font-bold text-gray-800">
-                    {prefix}{day.label}
-                    {day.holiday && (
-                      <span className="ml-2 align-middle text-xs font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
-                        {day.holiday}
-                      </span>
-                    )}
-                  </h3>
-                  {best && (
-                    <span className="text-sm text-gray-600">
-                      Best: <strong>{formatHour(best.start.dt)}–{formatHour(best.start.dt + best.hours.length * 3600)}</strong> · {best.score}
-                    </span>
-                  )}
-                </div>
-                {index >= DEFAULT_DAYS && (
-                  <p className="text-xs text-gray-500 -mt-3 mb-3">Forecasts this far ahead are less reliable.</p>
-                )}
-
-                <div className="space-y-2">
-                  {/* First row */}
-                  <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
-                    {morningHours.map(hour => (
-                      <HourCard key={hour.dt} hour={hour} nowSeconds={nowSeconds} onSelect={selectHour} />
-                    ))}
-                  </div>
-
-                  {/* Second row */}
-                  <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
-                    {afternoonHours.map(hour => (
-                      <HourCard key={hour.dt} hour={hour} nowSeconds={nowSeconds} onSelect={selectHour} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {visibleDays.map((day, index) => (
+          <DaySection
+            key={day.key}
+            day={day}
+            relativeLabel={relativeLabel(day.key)}
+            best={dayBest[index] ?? null}
+            lessReliable={index >= DEFAULT_DAYS}
+            nowSeconds={nowSeconds}
+            onSelect={selectHour}
+          />
+        ))}
 
         {hiddenDays > 0 && (
-          <div className="flex justify-center mt-4">
+          <div className="flex justify-center">
             <button
               onClick={() => setShowAllDays(v => !v)}
-              className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-blue-700 bg-white rounded-lg shadow hover:bg-blue-50 transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-slate-900 text-white font-display text-lg uppercase tracking-wide shadow hover:bg-slate-800 transition-colors"
             >
-              <ChevronDown className={`w-4 h-4 transition-transform ${showAllDays ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 transition-transform ${showAllDays ? 'rotate-180' : ''}`} />
               {showAllDays ? 'Show fewer days' : `Show ${hiddenDays} more day${hiddenDays > 1 ? 's' : ''}`}
             </button>
           </div>
         )}
 
-        <ScoreExplainer activity={activity} usingMockData={usingMockData} airQualityAvailable={meta.airQuality} />
+        <ScoreExplainer activity={activity} today={{ year: today.year, month: today.month, day: today.day }} />
+        <Footer usingMockData={usingMockData} airQualityAvailable={meta.airQuality} />
       </div>
     </div>
   );

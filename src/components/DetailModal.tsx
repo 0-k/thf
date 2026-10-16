@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CloudSun, Droplets, Leaf, ThermometerSun, Users, Wind, X, Zap } from 'lucide-react';
+import { CloudSun, Droplets, Eye, Leaf, Navigation2, Sun, ThermometerSun, Users, Wind, X, Zap } from 'lucide-react';
 import type { ScoredHour } from '../utils/ranking';
 import type { Activity } from '../utils/types';
 import { aqiCategory, getOpeningHours } from '../utils/scoring';
@@ -13,6 +13,7 @@ import {
   getScoreLabel,
 } from '../utils/display';
 import { formatHour, formatLongDay } from '../utils/time';
+import ActivityIcon from './ActivityIcon';
 
 interface DetailModalProps {
   hour: ScoredHour;
@@ -21,15 +22,22 @@ interface DetailModalProps {
 }
 
 const Tile = ({ icon, title, value, sub }: {
-  icon: React.ReactNode; title: string; value: string; sub?: string | undefined;
+  icon: React.ReactNode; title: string; value: React.ReactNode; sub?: string | undefined;
 }): React.ReactElement => (
-  <div className="bg-gray-50 p-2 rounded-lg">
-    <div className="flex items-center gap-1 text-gray-600 mb-0.5">
+  <div className="rounded-2xl bg-slate-50 ring-1 ring-slate-100 p-3">
+    <div className="flex items-center gap-1.5 text-slate-500 mb-1">
       {icon}
-      <span className="text-xs font-medium">{title}</span>
+      <span className="text-[11px] font-medium uppercase tracking-wider">{title}</span>
     </div>
-    <div className="text-xl font-bold text-gray-800">{value}</div>
-    {sub && <div className="text-xs text-gray-600 truncate">{sub}</div>}
+    <div className="font-display text-2xl font-bold text-slate-900 leading-none">{value}</div>
+    {sub && <div className="text-xs text-slate-500 mt-1 truncate">{sub}</div>}
+  </div>
+);
+
+const Row = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }): React.ReactElement => (
+  <div className="flex justify-between items-center text-sm py-1.5 border-b border-slate-100 last:border-0">
+    <span className="text-slate-500 flex items-center gap-1.5">{icon}{label}</span>
+    <span className="font-medium text-slate-800">{value}</span>
   </div>
 );
 
@@ -52,83 +60,88 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`Details for ${formatLongDay(hour.dt)} ${formatHour(hour.dt)}`}
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-3">
+        {/* Score header */}
+        <div className="relative px-5 pt-5 pb-4 sm:rounded-t-3xl rounded-t-3xl" style={{ backgroundColor: colors.backgroundColor, color: colors.color }}>
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15 sm:hidden" aria-hidden="true" />
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 rounded-full bg-white/50 hover:bg-white/80 p-1.5 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="flex items-end justify-between gap-4 pr-10">
             <div>
-              <h2 className="text-lg font-bold text-gray-800">{formatLongDay(hour.dt)}</h2>
-              <p className="text-sm text-gray-600">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.2em] opacity-80">
+                <ActivityIcon activity={activity} className="w-4 h-4" />{ACTIVITY_LABELS[activity]}
+              </div>
+              <h2 className="font-display text-3xl font-bold uppercase leading-none mt-1">{formatLongDay(hour.dt)}</h2>
+              <p className="font-display text-xl tracking-wide opacity-80">
                 {formatHour(hour.dt)}–{formatHour(hour.dt + 3600)}
-                {crowd.holiday && <span className="ml-2 text-purple-700">· {crowd.holiday}</span>}
+                {crowd.holiday && <span> · {crowd.holiday}</span>}
               </p>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 -mt-1" aria-label="Close">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 mb-3">
-            {/* Score */}
-            <div className="inline-block self-start px-4 py-2 rounded-lg border-2 shrink-0" style={colors}>
-              <div className="text-xs font-medium opacity-80">{ACTIVITY_LABELS[activity]} Score</div>
-              <div className="text-3xl font-bold">
-                {breakdown.status === 'closed' ? '-' : hour.score}
+            <div className="text-right shrink-0">
+              <div className="font-display text-6xl font-bold leading-none">
+                {breakdown.status === 'closed' ? '–' : breakdown.status === 'thunderstorm' ? '⚡' : hour.score}
               </div>
-              <div className="text-xs opacity-80">{getScoreLabel(hour.score, breakdown.status)}</div>
+              <div className="font-display text-lg uppercase tracking-wider">{getScoreLabel(hour.score, breakdown.status)}</div>
             </div>
+          </div>
+        </div>
 
-            {/* Why */}
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-xs text-gray-700 mb-1.5">What&apos;s holding it back</h3>
-              {breakdown.status === 'closed' && (
-                <p className="text-sm text-gray-600">
-                  The field is closed. Opening hours this month: {String(opening.open).padStart(2, '0')}:00–
-                  {String(opening.close).padStart(2, '0')}:00 (approx., gates follow daylight).
-                </p>
-              )}
-              {breakdown.status === 'thunderstorm' && (
-                <p className="text-sm text-red-700 flex items-center gap-1">
-                  <Zap className="w-4 h-4 shrink-0" /> Thunderstorm risk: no shelter on the open field.
-                </p>
-              )}
-              {breakdown.status === 'open' && breakdown.penalties.length === 0 && (
-                <p className="text-sm text-green-700">Nothing: ideal conditions.</p>
-              )}
-              {breakdown.status === 'open' && breakdown.penalties.length > 0 && (
-                <ul className="space-y-1">
-                  {breakdown.penalties.map(p => (
-                    <li key={p.factor} className="text-xs">
-                      <div className="flex justify-between gap-2">
-                        <span className="text-gray-700">
-                          <span className="font-medium">{p.label}</span>
-                          <span className="text-gray-500"> · {p.detail}</span>
-                        </span>
-                        <span className="font-semibold text-gray-800 tabular-nums">
-                          -{p.points < 1 ? p.points.toFixed(1) : Math.round(p.points)}
-                        </span>
-                      </div>
-                      <div className="h-1 bg-gray-100 rounded mt-0.5">
-                        <div className="h-1 bg-red-400 rounded" style={{ width: `${(p.points / maxPoints) * 100}%` }} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        <div className="p-5 space-y-5">
+          {/* Why */}
+          <div>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">What&apos;s holding it back</h3>
+            {breakdown.status === 'closed' && (
+              <p className="text-sm text-slate-600">
+                The field is closed. Opening hours this month: {String(opening.open).padStart(2, '0')}:00–
+                {String(opening.close).padStart(2, '0')}:00 (approx., gates follow daylight).
+              </p>
+            )}
+            {breakdown.status === 'thunderstorm' && (
+              <p className="text-sm text-red-700 flex items-center gap-1">
+                <Zap className="w-4 h-4 shrink-0" /> Thunderstorm risk: no shelter on the open field.
+              </p>
+            )}
+            {breakdown.status === 'open' && breakdown.penalties.length === 0 && (
+              <p className="text-sm text-emerald-700">Nothing: ideal conditions.</p>
+            )}
+            {breakdown.status === 'open' && breakdown.penalties.length > 0 && (
+              <ul className="space-y-2">
+                {breakdown.penalties.map(p => (
+                  <li key={p.factor} className="text-sm">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-slate-700">
+                        <span className="font-semibold">{p.label}</span>
+                        <span className="text-slate-500"> · {p.detail}</span>
+                      </span>
+                      <span className="font-display text-lg font-bold text-slate-900 tabular-nums leading-none">
+                        -{p.points < 1 ? p.points.toFixed(1) : Math.round(p.points)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full mt-1">
+                      <div className="h-1.5 bg-rose-400 rounded-full" style={{ width: `${(p.points / maxPoints) * 100}%` }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Weather Details */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="grid grid-cols-2 gap-2">
             <Tile
               icon={<ThermometerSun className="w-4 h-4" />}
               title="Temperature"
@@ -138,7 +151,18 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
             <Tile
               icon={<Wind className="w-4 h-4" />}
               title="Wind"
-              value={`${Math.round(hour.wind_speed)} m/s`}
+              value={
+                <span className="flex items-center gap-1.5">
+                  {Math.round(hour.wind_speed)} m/s
+                  {hour.wind_deg !== undefined && (
+                    <Navigation2
+                      className="w-5 h-5 text-slate-500"
+                      style={{ transform: `rotate(${hour.wind_deg + 180}deg)` }}
+                      aria-label={`blowing towards ${compassDirection(hour.wind_deg + 180)}`}
+                    />
+                  )}
+                </span>
+              }
               sub={[
                 hour.wind_deg !== undefined ? `from ${compassDirection(hour.wind_deg)}` : null,
                 hour.wind_gust !== undefined && hour.wind_gust > hour.wind_speed ? `gusts ${Math.round(hour.wind_gust)} m/s` : null,
@@ -159,31 +183,17 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
           </div>
 
           {/* Additional Details */}
-          <div className="border-t pt-2 space-y-1">
-            <h3 className="font-semibold text-xs text-gray-700 mb-1.5">Additional Details</h3>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600 flex items-center gap-1"><Leaf className="w-3 h-3" /> Air quality (EAQI)</span>
-              <span className="font-medium text-gray-800">
-                {eaqi !== undefined ? `${Math.round(eaqi)} · ${aqiCategory(eaqi)}` : 'not available'}
-              </span>
-            </div>
-            {hour.uvi !== undefined && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">UV Index</span>
-                <span className="font-medium text-gray-800">{hour.uvi.toFixed(1)}</span>
-              </div>
-            )}
-            {hour.clouds !== undefined && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600 flex items-center gap-1"><CloudSun className="w-3 h-3" /> Cloud Cover</span>
-                <span className="font-medium text-gray-800">{Math.round(hour.clouds)}%</span>
-              </div>
-            )}
+          <div>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-1">Additional Details</h3>
+            <Row
+              icon={<Leaf className="w-4 h-4" />}
+              label="Air quality (EAQI)"
+              value={eaqi !== undefined ? `${Math.round(eaqi)} · ${aqiCategory(eaqi)}` : 'not available'}
+            />
+            {hour.uvi !== undefined && <Row icon={<Sun className="w-4 h-4" />} label="UV index" value={hour.uvi.toFixed(1)} />}
+            {hour.clouds !== undefined && <Row icon={<CloudSun className="w-4 h-4" />} label="Cloud cover" value={`${Math.round(hour.clouds)}%`} />}
             {hour.visibility !== undefined && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">Visibility</span>
-                <span className="font-medium text-gray-800">{(hour.visibility / 1000).toFixed(1)} km</span>
-              </div>
+              <Row icon={<Eye className="w-4 h-4" />} label="Visibility" value={`${(hour.visibility / 1000).toFixed(1)} km`} />
             )}
           </div>
         </div>

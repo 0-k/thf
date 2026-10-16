@@ -17,14 +17,15 @@ export const ACTIVITY_LABELS: Record<Activity, string> = {
   cycling: 'Cycling',
   jogging: 'Jogging',
   kiting: 'Kiting',
-  socializing: 'Socializing',
+  socializing: 'Picnic',
 };
 
-export const ACTIVITY_ACTIVE_CLASSES: Record<Activity, string> = {
-  cycling: 'bg-blue-600 text-white shadow-md',
-  jogging: 'bg-green-600 text-white shadow-md',
-  kiting: 'bg-purple-600 text-white shadow-md',
-  socializing: 'bg-orange-600 text-white shadow-md',
+/** Icon colour for the active activity tab */
+export const ACTIVITY_ACCENT_TEXT: Record<Activity, string> = {
+  cycling: 'text-blue-600',
+  jogging: 'text-emerald-600',
+  kiting: 'text-violet-600',
+  socializing: 'text-orange-500',
 };
 
 export const CLOSED_COLORS: ScoreColor = {

@@ -132,3 +132,16 @@ export const formatDecimalHours = (hours: number): string => {
   const m = totalMinutes % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
+
+const weekdayLongFormatter = new Intl.DateTimeFormat('en-US', { timeZone: BERLIN_TZ, weekday: 'long' });
+const weekdayShortFormatter = new Intl.DateTimeFormat('en-US', { timeZone: BERLIN_TZ, weekday: 'short' });
+const shortDateFormatter = new Intl.DateTimeFormat('en-US', { timeZone: BERLIN_TZ, month: 'short', day: 'numeric' });
+
+/** "Monday" in Berlin time. */
+export const formatWeekday = (unixSeconds: number): string => weekdayLongFormatter.format(new Date(unixSeconds * 1000));
+
+/** "Mon" in Berlin time. */
+export const formatWeekdayShort = (unixSeconds: number): string => weekdayShortFormatter.format(new Date(unixSeconds * 1000));
+
+/** "Oct 19" in Berlin time. */
+export const formatShortDate = (unixSeconds: number): string => shortDateFormatter.format(new Date(unixSeconds * 1000));
