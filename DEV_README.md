@@ -25,13 +25,15 @@ npm run build
 - **Entry point:** `src/main.tsx`
 - **Main app:** `src/App.tsx` (TypeScript, fully typed)
 - **Scoring logic:** `src/utils/scoring.ts` (exported, testable)
-- **Tests:** `src/utils/scoring.test.ts` (63 comprehensive tests)
+- **Tests:** `src/utils/*.test.ts`, `netlify/**/*.test.ts` (131 tests)
 
 ### Backend (Netlify Functions)
-- **Weather API:** `netlify/functions/weather.js`
-  - Fetches from Open-Meteo API (free, no key required)
-  - Smart caching: Netlify Blobs (prod) → In-memory (fallback)
+- **Weather API:** `netlify/functions/weather.ts`
+  - Fetches forecast + air quality from Open-Meteo (free, no key required)
+  - Transform in `netlify/lib/openMeteo.ts` (unix timestamps, preceding-hour alignment)
+  - Smart caching: Netlify Blobs (prod, via `connectLambda`) → In-memory (fallback) → stale data if the API is down
   - Returns 7 days forecast + today's past hours
+  - Don't put non-function files (tests, helpers) in `netlify/functions/`: Netlify deploys every file there
 
 ### Caching Strategy
 
@@ -92,12 +94,15 @@ npm run test:run
 npm run test:ui
 ```
 
-**Test coverage:**
-- 63 tests covering all scoring functions
-- Opening hours logic (summer/winter)
-- Crowd factors
-- All weather penalties
-- Edge cases (extreme temps, thunderstorms, etc.)
+**Test coverage (131 tests):**
+- All scoring functions, penalties, breakdown, generated explanations
+- Opening hours logic (monthly, Berlin time)
+- Crowd model incl. calibration against the 2014 visitor counts and observed peak times
+- Berlin time, DST switches, sunrise/sunset, public holidays
+- Best-window ranking
+- Open-Meteo transform and the Netlify Function (cache, stale fallback, errors)
+
+Typecheck everything (the function has its own config): `npm run typecheck`
 
 ## Deployment
 
@@ -193,14 +198,21 @@ thf/
 ├── src/
 │   ├── App.tsx               # Main React app (TypeScript)
 │   ├── main.tsx              # Entry point
+│   ├── components/           # UI components
 │   ├── utils/
-│   │   ├── scoring.ts        # Scoring logic (exported)
-│   │   └── scoring.test.ts   # 63 comprehensive tests
+│   │   ├── scoring.ts        # Scoring engine + config
+│   │   ├── crowd.ts          # Crowd model
+│   │   ├── ranking.ts        # Best 2-hour windows
+│   │   ├── time.ts           # Berlin time helpers
+│   │   ├── calendar.ts       # Sun times, holidays
+│   │   └── *.test.ts         # Tests
 │   └── test/
-│       └── setup.js          # Vitest setup
+│       └── setup.ts          # Vitest setup
 ├── netlify/
-│   └── functions/
-│       └── weather.js        # Weather API (hybrid caching)
+│   ├── functions/
+│   │   └── weather.ts        # Weather API (hybrid caching)
+│   ├── lib/openMeteo.ts      # Pure transform
+│   └── tests/                # Function tests
 ├── dist/                     # Build output (gitignored)
 ├── netlify.toml              # Netlify config
 ├── package.json              # Dependencies & scripts
@@ -212,10 +224,15 @@ thf/
 
 ## Common Issues
 
-### Issue: "Mock data" showing in production
+### Issue: "Couldn't load the forecast" in production
 
-**Cause:** Weather function is failing
+**Cause:** Weather function is failing and has no cached data to fall back on (production never shows mock data)
 **Solution:** Check Netlify function logs for errors
+
+### Issue: Times look shifted
+
+All forecast logic uses Berlin time (`src/utils/time.ts`). Never call `Date#getHours()`/`getDay()` on
+forecast timestamps, and never parse Open-Meteo local time strings with `new Date()` (the function runs in UTC).
 
 ### Issue: Cache not working
 
@@ -225,7 +242,8 @@ thf/
 ### Issue: Tests failing
 
 **Cause:** Scoring logic changed
-**Solution:** Update tests in `src/utils/scoring.test.ts` to match new behavior
+**Solution:** Update tests in `src/utils/scoring.test.ts` to match new behavior. If `crowd.test.ts`
+calibration tests fail after changing profile shapes, re-solve the day levels (see `src/utils/crowd.ts`).
 
 ## Coding Conventions
 
