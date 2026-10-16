@@ -34,13 +34,13 @@ export default function BestTimes({ slots, activity, nowSeconds, onSelect }: Bes
         <div className="flex items-center gap-3">
           <PlaneTakeoff className="w-7 h-7 text-amber-400 shrink-0" />
           <div>
-            <h2 className="font-display text-2xl font-bold uppercase tracking-wide leading-none">Departures</h2>
+            <h2 className="font-display text-2xl font-extrabold leading-none">Departures</h2>
             <p className="text-xs text-white/60 mt-1">
               Best 2-hour windows for {ACTIVITY_LABELS[activity].toLowerCase()}, next 4 days · a visit lasts ~2 h
             </p>
           </div>
         </div>
-        <span className="hidden sm:block font-display text-amber-400 tracking-[0.2em] text-lg tabular-nums">
+        <span className="hidden sm:block font-display font-bold text-amber-400 tracking-[0.15em] text-base tabular-nums">
           THF {formatClock(nowSeconds)}
         </span>
       </div>
@@ -49,7 +49,7 @@ export default function BestTimes({ slots, activity, nowSeconds, onSelect }: Bes
         <p className="px-5 py-6 text-sm text-white/70">No open hours with a usable forecast in this period.</p>
       ) : (
         <>
-          <div className="hidden sm:grid grid-cols-[9rem_8rem_1fr_12rem_4rem] gap-4 px-5 pt-3 pb-1 text-[11px] uppercase tracking-[0.2em] text-white/40">
+          <div className="hidden sm:grid grid-cols-[10.5rem_7.5rem_1fr_12rem_4rem] gap-4 px-5 pt-3 pb-1 text-[11px] uppercase tracking-[0.2em] text-white/40">
             <span>Time</span><span>Day</span><span>Conditions</span><span>Remarks</span><span className="text-right">Score</span>
           </div>
           <ol>
@@ -68,18 +68,18 @@ export default function BestTimes({ slots, activity, nowSeconds, onSelect }: Bes
                   <button
                     type="button"
                     onClick={() => onSelect(first)}
-                    className="w-full text-left grid grid-cols-[1fr_auto] sm:grid-cols-[9rem_8rem_1fr_12rem_4rem] gap-x-4 gap-y-1 items-center px-5 py-3 border-t border-white/5 hover:bg-white/5 focus-visible:bg-white/5 transition-colors"
+                    className="w-full text-left grid grid-cols-[1fr_auto] sm:grid-cols-[10.5rem_7.5rem_1fr_12rem_4rem] gap-x-4 gap-y-1 items-center px-5 py-3 border-t border-white/5 hover:bg-white/5 focus-visible:bg-white/5 transition-colors"
                   >
-                    <span className="font-display text-2xl font-semibold text-amber-300 tabular-nums">
+                    <span className="font-display text-xl sm:text-2xl font-extrabold text-amber-300 tabular-nums">
                       {formatHour(first.dt)}<span className="text-amber-300/50">–</span>{formatHour(end)}
                     </span>
                     <span
-                      className="sm:order-last row-span-2 sm:row-span-1 justify-self-end font-display text-3xl font-bold rounded-xl px-2.5 py-0.5 tabular-nums"
+                      className="sm:order-last row-span-2 sm:row-span-1 justify-self-end font-display text-2xl font-extrabold rounded-xl px-2.5 py-0.5 tabular-nums"
                       style={{ backgroundColor: colors.backgroundColor, color: colors.color }}
                     >
                       {slot.score}
                     </span>
-                    <span className="font-display text-lg uppercase tracking-wide text-white/90">{relativeDay(first.dt, nowSeconds)}</span>
+                    <span className="font-display text-base font-bold text-white/90">{relativeDay(first.dt, nowSeconds)}</span>
                     <span className="col-span-2 sm:col-span-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-white/75">
                       <span className="flex items-center gap-1"><ThermometerSun className="w-3.5 h-3.5" />{Math.round(avg(h => h.temp))}°C</span>
                       <span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5" />{Math.round(avg(h => h.wind_speed))} m/s</span>
@@ -87,7 +87,7 @@ export default function BestTimes({ slots, activity, nowSeconds, onSelect }: Bes
                       <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{CROWD_LEVEL_LABELS[busiest.breakdown.crowd.level]}</span>
                     </span>
                     <span className="col-span-2 sm:col-span-1 flex items-center gap-2 text-xs">
-                      <span className={`font-display text-sm uppercase tracking-wider rounded px-1.5 py-0.5 whitespace-nowrap ${tag.className}`}>{tag.text}</span>
+                      <span className={`font-display text-xs font-extrabold rounded-full px-2 py-0.5 whitespace-nowrap ${tag.className}`}>{tag.text}</span>
                       <span className="text-white/60 truncate">
                         {worst && worst.points >= 3 ? `${worst.label} -${Math.round(worst.points)}` : 'Clear'}
                       </span>

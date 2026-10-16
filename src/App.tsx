@@ -187,12 +187,12 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center p-4 text-white ${SKY_GRADIENTS[sky]}`}>
         <div className="w-full max-w-md text-center">
-          <span className="font-display font-bold tracking-[0.2em] bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-sm">THF</span>
-          <h1 className="font-display font-bold uppercase text-5xl mt-4 leading-none">Tempelhofer Feld</h1>
+          <span className="font-display font-extrabold tracking-[0.2em] bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-sm">THF</span>
+          <h1 className="font-display font-black text-5xl mt-4 leading-none tracking-tight">Tempelhofer Feld</h1>
           {error ? (
             <div className="mt-6 rounded-3xl bg-black/25 ring-1 ring-white/15 p-6">
               <TriangleAlert className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-              <p className="font-display text-2xl font-bold uppercase">Couldn&apos;t load the forecast</p>
+              <p className="font-display text-2xl font-extrabold">Couldn&apos;t load the forecast</p>
               <p className="text-sm text-white/80 mt-1 mb-4">The weather service is unavailable right now ({error}).</p>
               <button
                 onClick={() => void loadForecast()}
@@ -288,7 +288,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
           <div className="flex justify-center">
             <button
               onClick={() => setShowAllDays(v => !v)}
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-slate-900 text-white font-display text-lg uppercase tracking-wide shadow hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-slate-900 text-white font-display text-base font-bold shadow hover:bg-slate-800 transition-colors"
             >
               <ChevronDown className={`w-5 h-5 transition-transform ${showAllDays ? 'rotate-180' : ''}`} />
               {showAllDays ? 'Show fewer days' : `Show ${hiddenDays} more day${hiddenDays > 1 ? 's' : ''}`}

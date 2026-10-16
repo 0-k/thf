@@ -45,7 +45,7 @@ export default function HourCard({ hour, nowSeconds, onSelect }: HourCardProps):
         <div className={`text-[10px] font-semibold w-full text-center ${isClosed ? '' : 'text-slate-700'} ${isNow ? 'uppercase tracking-wider' : ''}`}>
           {isNow ? 'Now' : formatHour(hour.dt)}
         </div>
-        <div className="font-display text-xl font-bold leading-none my-0.5">
+        <div className="font-display text-lg font-extrabold leading-none my-0.5">
           {isClosed ? '-' : status === 'thunderstorm' ? '⚡' : hour.score}
         </div>
       </div>

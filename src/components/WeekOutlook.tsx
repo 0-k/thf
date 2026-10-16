@@ -16,8 +16,8 @@ interface WeekOutlookProps {
 export default function WeekOutlook({ days, defaultVisible, onJump }: WeekOutlookProps): React.ReactElement {
   return (
     <section className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-4 sm:p-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-2xl font-bold uppercase tracking-wide text-slate-900">7-Day Outlook</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <h2 className="font-display text-2xl font-extrabold text-slate-900 whitespace-nowrap">7-Day Outlook</h2>
         <span className="text-xs text-slate-500">Best 2-hour window per day</span>
       </div>
       <div className="mt-3 -mx-1 px-1 flex gap-2 overflow-x-auto snap-x pb-1">
@@ -34,12 +34,12 @@ export default function WeekOutlook({ days, defaultVisible, onJump }: WeekOutloo
                 index >= defaultVisible ? 'opacity-80' : ''
               }`}
             >
-              <div className="font-display text-lg font-semibold uppercase leading-none text-slate-800">
+              <div className="font-display text-base font-extrabold leading-none text-slate-800">
                 {relativeLabel ?? formatWeekdayShort(firstDt)}
               </div>
               <div className="text-[11px] text-slate-500 mb-2">{formatShortDate(firstDt)}</div>
               <div
-                className={`rounded-xl h-12 flex items-center justify-center font-display text-3xl font-bold ${
+                className={`rounded-xl h-12 flex items-center justify-center font-display text-3xl font-extrabold ${
                   colors ? 'border' : 'bg-slate-100 text-slate-400'
                 }`}
                 style={colors ?? undefined}

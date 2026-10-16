@@ -7,7 +7,7 @@ export default function Footer({ usingMockData, airQualityAvailable }: { usingMo
       <Runway className="bg-slate-950/60" />
       <div className="px-5 sm:px-6 py-5 grid gap-4 sm:grid-cols-[1fr_auto] text-sm">
         <div className="space-y-1.5">
-          <p className="font-display text-xl font-bold uppercase tracking-wide text-white">Tempelhofer Feld Forecast</p>
+          <p className="font-display text-xl font-extrabold text-white">Tempelhofer Feld Forecast</p>
           <p className="text-slate-400">
             {usingMockData
               ? 'Showing simulated weather (development mode).'

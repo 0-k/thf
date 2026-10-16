@@ -8,11 +8,11 @@ export default function Runway({ className = '' }: { className?: string }): Reac
       <div className="flex flex-col gap-1 shrink-0">
         {thresholdBars.map((_, i) => <span key={i} className="block h-0.5 w-7 bg-white/50 rounded-full" />)}
       </div>
-      <span className="font-display font-bold text-white/60 tracking-widest text-lg shrink-0">09L</span>
+      <span className="font-display font-extrabold text-white/60 tracking-widest text-base shrink-0">09L</span>
       <div className="flex-1 flex items-center gap-4 overflow-hidden">
         {Array.from({ length: 40 }).map((_, i) => <span key={i} className="block h-0.5 w-8 shrink-0 bg-white/40 rounded-full" />)}
       </div>
-      <span className="font-display font-bold text-white/60 tracking-widest text-lg shrink-0">27R</span>
+      <span className="font-display font-extrabold text-white/60 tracking-widest text-base shrink-0">27R</span>
       <div className="flex flex-col gap-1 shrink-0">
         {thresholdBars.map((_, i) => <span key={i} className="block h-0.5 w-7 bg-white/50 rounded-full" />)}
       </div>

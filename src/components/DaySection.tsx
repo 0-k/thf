@@ -55,10 +55,10 @@ export default function DaySection({ day, relativeLabel, best, lessReliable, now
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 mb-4">
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h3 className="font-display text-3xl sm:text-4xl font-bold uppercase leading-none text-slate-900">
+            <h3 className="font-display text-3xl sm:text-4xl font-extrabold leading-none text-slate-900">
               {relativeLabel ?? formatWeekday(firstDt)}
             </h3>
-            <span className="font-display text-xl uppercase tracking-wide text-slate-400">
+            <span className="font-display text-lg font-semibold text-slate-400">
               {relativeLabel ? `${formatWeekday(firstDt)} · ` : ''}{formatShortDate(firstDt)}
             </span>
             {day.holiday && (
@@ -83,11 +83,11 @@ export default function DaySection({ day, relativeLabel, best, lessReliable, now
           >
             <span className="text-left leading-tight">
               <span className="block text-[10px] uppercase tracking-[0.2em] opacity-75">Best window</span>
-              <span className="font-display text-xl font-semibold">
+              <span className="font-display text-lg font-bold">
                 {formatHour(best.start.dt)}–{formatHour(best.start.dt + best.hours.length * 3600)}
               </span>
             </span>
-            <span className="font-display text-3xl font-bold">{best.score}</span>
+            <span className="font-display text-3xl font-extrabold">{best.score}</span>
           </button>
         )}
       </div>

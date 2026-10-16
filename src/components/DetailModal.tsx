@@ -29,7 +29,7 @@ const Tile = ({ icon, title, value, sub }: {
       {icon}
       <span className="text-[11px] font-medium uppercase tracking-wider">{title}</span>
     </div>
-    <div className="font-display text-2xl font-bold text-slate-900 leading-none">{value}</div>
+    <div className="font-display text-xl font-extrabold text-slate-900 leading-none">{value}</div>
     {sub && <div className="text-xs text-slate-500 mt-1 truncate">{sub}</div>}
   </div>
 );
@@ -85,17 +85,17 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
               <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.2em] opacity-80">
                 <ActivityIcon activity={activity} className="w-4 h-4" />{ACTIVITY_LABELS[activity]}
               </div>
-              <h2 className="font-display text-3xl font-bold uppercase leading-none mt-1">{formatLongDay(hour.dt)}</h2>
-              <p className="font-display text-xl tracking-wide opacity-80">
+              <h2 className="font-display text-2xl font-extrabold leading-tight mt-1">{formatLongDay(hour.dt)}</h2>
+              <p className="font-display text-lg font-semibold opacity-80">
                 {formatHour(hour.dt)}–{formatHour(hour.dt + 3600)}
                 {crowd.holiday && <span> · {crowd.holiday}</span>}
               </p>
             </div>
             <div className="text-right shrink-0">
-              <div className="font-display text-6xl font-bold leading-none">
+              <div className="font-display text-5xl font-black leading-none">
                 {breakdown.status === 'closed' ? '–' : breakdown.status === 'thunderstorm' ? '⚡' : hour.score}
               </div>
-              <div className="font-display text-lg uppercase tracking-wider">{getScoreLabel(hour.score, breakdown.status)}</div>
+              <div className="font-display text-base font-bold">{getScoreLabel(hour.score, breakdown.status)}</div>
             </div>
           </div>
         </div>
@@ -127,7 +127,7 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
                         <span className="font-semibold">{p.label}</span>
                         <span className="text-slate-500"> · {p.detail}</span>
                       </span>
-                      <span className="font-display text-lg font-bold text-slate-900 tabular-nums leading-none">
+                      <span className="font-display text-base font-extrabold text-slate-900 tabular-nums leading-none">
                         -{p.points < 1 ? p.points.toFixed(1) : Math.round(p.points)}
                       </span>
                     </div>

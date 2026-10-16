@@ -103,8 +103,9 @@ Top to bottom: Hero → Departures → 7-Day Outlook → day sections → explai
 
 ### Design System
 - Ex-airport identity: dark navy "departures board", amber signage accent (`amber-400`), runway markings
-- Display font: Barlow Condensed (DIN-like signage), **self-hosted** via `@fontsource/barlow-condensed`
-  (no Google Fonts CDN: GDPR). Exposed as the Tailwind token `font-display` (`@theme` in `index.css`)
+- Font: Nunito (rounded, friendly) for body and headings, **self-hosted** via `@fontsource-variable/nunito`
+  (no Google Fonts CDN: GDPR). Tailwind tokens `font-sans` / `font-display` (`@theme` in `index.css`);
+  headings in sentence case, extrabold/black weights
 - Score colors: continuous HSL green→yellow→red from `getScoreColor` (unchanged semantics)
 - Crowd chart: categorical slots 1-3 of the validated dataviz palette (#2a78d6, #eb6834, #1baf7a),
   2px lines, direct labels + legend + table view (aqua is < 3:1 on white)

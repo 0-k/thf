@@ -66,7 +66,7 @@ function NowPanel({ current, nextOpen, nowSeconds, activityLabel }: {
         <div className="text-[11px] uppercase tracking-[0.2em] text-white/60">
           Right now · {current ? `${formatHour(current.dt)}–${formatHour(current.dt + 3600)}` : formatClock(nowSeconds)}
         </div>
-        <div className="font-display text-3xl sm:text-4xl font-bold uppercase leading-tight">{headline}</div>
+        <div className="font-display text-3xl sm:text-4xl font-extrabold leading-tight">{headline}</div>
         <div className="text-sm text-white/80">{detail}</div>
         {current && (
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-white/90" aria-label={`Conditions for ${activityLabel}`}>
@@ -98,7 +98,7 @@ export default function Hero(props: HeroProps): React.ReactElement {
       <div className="relative p-5 sm:p-8">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-display font-bold tracking-[0.2em] bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-sm shrink-0">THF</span>
+            <span className="font-display font-extrabold tracking-[0.2em] bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-sm shrink-0">THF</span>
             <span className="text-[11px] uppercase tracking-[0.2em] text-white/70 truncate">Berlin · former airport · 52.47°N 13.41°E</span>
           </div>
           <button
@@ -113,7 +113,7 @@ export default function Hero(props: HeroProps): React.ReactElement {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <h1 className="font-display font-bold uppercase leading-[0.85] tracking-tight text-6xl sm:text-7xl md:text-8xl">
+            <h1 className="font-display font-black leading-[0.95] tracking-tight text-5xl sm:text-6xl md:text-7xl">
               Tempelhofer<br />Feld
             </h1>
             <p className="mt-4 text-white/85 max-w-md">
@@ -144,7 +144,7 @@ export default function Hero(props: HeroProps): React.ReactElement {
                 key={a}
                 onClick={() => onActivityChange(a)}
                 aria-pressed={active}
-                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-display text-lg font-semibold uppercase tracking-wide transition-all ${
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-display text-base font-bold transition-all ${
                   active ? 'bg-white text-slate-900 shadow-lg' : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
               >

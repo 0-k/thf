@@ -29,7 +29,7 @@ export default function ScoreExplainer({ activity, today }: ScoreExplainerProps)
 
   return (
     <section className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-6">
-      <h2 className="font-display text-2xl sm:text-3xl font-bold uppercase tracking-wide text-slate-900">
+      <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-slate-900">
         How the {ACTIVITY_LABELS[activity]} score works
       </h2>
       <p className="text-sm text-slate-600 mt-1 max-w-2xl">
@@ -43,7 +43,7 @@ export default function ScoreExplainer({ activity, today }: ScoreExplainerProps)
             <li key={row.title} className="rounded-2xl ring-1 ring-slate-200 p-3">
               <div className="flex items-center gap-2">
                 <span className="rounded-lg bg-slate-100 text-slate-600 p-1.5">{FACTOR_ICONS[row.title] ?? null}</span>
-                <span className="font-display text-lg font-semibold uppercase tracking-wide text-slate-900">{row.title}</span>
+                <span className="font-display text-base font-extrabold text-slate-900">{row.title}</span>
               </div>
               <p className="text-sm text-slate-700 mt-1.5">{row.rule}</p>
               <p className="text-xs text-slate-500 mt-1">{row.examples}</p>
@@ -52,7 +52,7 @@ export default function ScoreExplainer({ activity, today }: ScoreExplainerProps)
         </ul>
 
         <div className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 p-4">
-          <h3 className="font-display text-xl font-bold uppercase tracking-wide text-amber-950">How crowds are estimated</h3>
+          <h3 className="font-display text-xl font-extrabold text-amber-950">How crowds are estimated</h3>
           <p className="text-sm text-amber-950/90 mt-1">
             There is no live visitor count, so crowds are modelled: <strong>day type</strong> × <strong>time of day</strong>{' '}
             (peaks follow sunset) × <strong>weather</strong> (warmth, rain, sunshine, wind).

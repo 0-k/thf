@@ -39,7 +39,7 @@ export default function ScoreDial({ score, status, tone = 'dark', size = 'lg' }:
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`font-display font-bold leading-none ${size === 'lg' ? 'text-5xl' : 'text-3xl'}`}>{text}</span>
+        <span className={`font-display font-black leading-none tracking-tight ${size === 'lg' ? 'text-4xl' : 'text-2xl'}`}>{text}</span>
         <span className="text-[10px] uppercase tracking-[0.2em] opacity-70 mt-0.5">score</span>
       </div>
     </div>
