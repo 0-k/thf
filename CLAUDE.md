@@ -17,7 +17,11 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 ## Key Files
 
 - `src/App.tsx` - Main React app: data loading, day grouping, layout
-- `src/components/` - `HourCard`, `DetailModal` (score breakdown), `BestTimes`, `ScoreExplainer`
+- `src/components/` - `Hero` (live sky + "right now" dial + activity tabs), `BestTimes` ("Departures" board),
+  `WeekOutlook`, `DaySection`, `HourCard`, `DetailModal` (score breakdown, bottom sheet on mobile),
+  `ScoreExplainer` + `CrowdCurveChart`, `Footer`, small pieces (`ScoreDial`, `Runway`, `ActivityIcon`)
+- `src/utils/sky.ts` - Hero sky gradient by time of day (sunrise/sunset) and weather
+- `src/App.test.tsx` - UI smoke test (render, activity switch, modal, production error state)
 - `src/main.tsx` - React entry point (TypeScript)
 - `src/utils/scoring.ts` - Scoring engine + `SCORING_CONFIG` + generated explanations
 - `src/utils/crowd.ts` - Crowd model (calibrated to Grün Berlin visitor counts)
@@ -84,13 +88,26 @@ Air quality uses the real European AQI (CAMS) mapped onto the 1-5 config scale (
 6. Frontend scores client-side (`scoreHour`) in Berlin time regardless of the viewer's timezone
 
 ### Layout
-- 2-row grid per day (2x12 on desktop, 2x6 on mobile); 4 days shown, "Show 3 more days" toggle (7-day data)
-- Best Times to Go: top 3 non-overlapping 2-hour windows (avg visit ≈ 2 h) from now to the end of day 4,
-  each with its main drawback; each day header shows that day's best window
-- Activity selector: 2x2 grid on mobile, 1x4 on desktop (choice remembered in localStorage)
-- Compact cards: time ("Now" + ring for the current hour), score, temp, wind, rain %, crowd dots
-- Detail modal: score breakdown, weather, crowds, AQI, UV, clouds, visibility (Esc/backdrop closes)
-- Header: today's opening hours, sunset, last update time
+Top to bottom: Hero → Departures → 7-Day Outlook → day sections → explainer → footer.
+- **Hero:** sky gradient follows the real time of day/weather (`sky.ts`), "Right now" score dial for the
+  current hour (or "Field closed · opens …"), opening hours/sunset/update chips, activity tabs
+  (2x2 on mobile, 1x4 on desktop, remembered in localStorage), runway strip (09L/27R)
+- **Departures:** top 3 non-overlapping 2-hour windows (avg visit ≈ 2 h) from now to the end of day 4,
+  with conditions, remark and main drawback
+- **7-Day Outlook:** best window per day; tapping a day scrolls to it (expands days 5-7)
+- **Day sections:** 2-row grid per day (2x12 on desktop, 2x6 on mobile), hi/lo/rain/wind summary,
+  best-window chip; 4 days shown, "Show 3 more days" toggle
+- **Hour cards:** time (10px; "Now" + amber ring), score, temp, wind, rain %, crowd dots; closed hours hatched
+- **Detail modal:** bottom sheet on mobile; score header, breakdown bars, weather tiles (wind arrow), AQI/UV/clouds
+- **Explainer:** factor cards generated from config + crowd-curve chart (hover tooltip, table view)
+
+### Design System
+- Ex-airport identity: dark navy "departures board", amber signage accent (`amber-400`), runway markings
+- Display font: Barlow Condensed (DIN-like signage), **self-hosted** via `@fontsource/barlow-condensed`
+  (no Google Fonts CDN: GDPR). Exposed as the Tailwind token `font-display` (`@theme` in `index.css`)
+- Score colors: continuous HSL green→yellow→red from `getScoreColor` (unchanged semantics)
+- Crowd chart: categorical slots 1-3 of the validated dataviz palette (#2a78d6, #eb6834, #1baf7a),
+  2px lines, direct labels + legend + table view (aqua is < 3:1 on white)
 
 ## Roadmap: Professional Robustness
 
@@ -221,7 +238,7 @@ June Saturday 67/100 and a grey January Tuesday 30/100; new: 4 and 4.
 - All date logic in Berlin time via `src/utils/time.ts` (`berlinParts`, `berlinToUnix`); tests build
   timestamps with `berlinToUnix` so they pass in any machine timezone
 - Use ES6+ React hooks (useState, useEffect)
-- Tailwind utility classes only (no custom CSS)
+- Tailwind utility classes only (no custom CSS); theme tokens go in the `@theme` block of `index.css`
 - Continuous penalty scales (no step functions)
 - All temps in Celsius
 - All wind speeds in m/s
@@ -247,11 +264,13 @@ June Saturday 67/100 and a grey January Tuesday 30/100; new: 4 and 4.
    ```
    Opens at http://localhost:8888
 
-## Deployment to Netlify
+## Deployment to Netlify (pipeline)
 
-1. Push code to GitHub
-2. Connect repository to Netlify
-3. Deploy! (auto-builds on push, no env vars needed)
+- Netlify site: **thfweather** → production https://thfweather.netlify.app (deploys from `master`)
+- Every PR gets a deploy preview: `https://deploy-preview-<PR#>--thfweather.netlify.app`
+- `claude/dev_*` branch deploys only if that pattern is enabled in the Netlify UI
+- Every context runs `npm run verify && npm run build` (typecheck + all tests, then Vite build):
+  a failing test or type error stops the deploy. No GitHub Actions; Netlify is the CI.
 
 ## Features Implemented
 

@@ -1,18 +1,20 @@
+# Every deploy (production, PR previews, branch deploys) must pass the
+# typecheck + test suite first; a failing check stops the deploy.
 [build]
-  command = "npm run build"
+  command = "npm run verify && npm run build"
   publish = "dist"
   functions = "netlify/functions"
 
 # Deploy previews for pull requests (enables testing before merging)
 [context.deploy-preview]
-  command = "npm run build"
+  command = "npm run verify && npm run build"
 
 # Branch deploys for claude/dev_* branches (staging environment)
 # Note: The branch pattern must be configured in Netlify UI under:
 # Site settings → Build & deploy → Continuous deployment → Branch deploys
 # Set pattern to: claude/dev_*
 [context.branch-deploy]
-  command = "npm run build"
+  command = "npm run verify && npm run build"
 
 [dev]
   command = "npm run dev"

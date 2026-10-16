@@ -30,6 +30,9 @@ A weather-based activity scoring app for Tempelhofer Feld in Berlin. Get hourly 
   - Detailed modal for each hour
   - Always in Berlin time, wherever you open it
 
+- **Airfield design**: live sky header that follows the time of day and weather, a "Departures" board
+  for the best times, runway markings, a self-hosted DIN-style display font
+
 - **100% Free**:
   - No API keys required
   - Free weather data from Open-Meteo (DWD ICON model)
@@ -79,12 +82,13 @@ npm run test:run
 npm run test:ui
 ```
 
-**Test Coverage:** 131 unit tests covering scoring (all activities, edge cases, opening hours), the crowd
+**Test Coverage:** 138 tests: a UI smoke test plus unit tests covering scoring (all activities, edge cases, opening hours), the crowd
 model (including its calibration against the visitor counts), Berlin time/DST/holidays, ranking, the
 Open-Meteo transform (timestamps, hour alignment) and the Netlify Function (caching, stale fallback).
 
 ```bash
 npm run typecheck    # frontend + Netlify Function
+npm run verify       # typecheck + all tests (what Netlify runs before every build)
 ```
 
 ## Deployment to Netlify (100% Free)
@@ -111,6 +115,14 @@ npm run typecheck    # frontend + Netlify Function
 Your site will be live at `https://your-site-name.netlify.app`
 
 **No environment variables needed!** Open-Meteo API is free and requires no API key.
+
+### Pipeline
+
+Netlify is the CI/CD: every deploy context runs `npm run verify && npm run build`, so a failing test or
+type error stops the deploy.
+
+- **Production:** https://thfweather.netlify.app (from `master`)
+- **Pull requests:** automatic deploy preview at `https://deploy-preview-<PR#>--thfweather.netlify.app`
 
 ### Staging Deployments
 
@@ -197,7 +209,7 @@ public holidays count as Sundays. 100 = a sunny summer Sunday afternoon.
 - **Icons**: Lucide React
 - **Backend**: Netlify Functions (TypeScript serverless)
 - **API**: Open-Meteo (DWD ICON model, free)
-- **Testing**: Vitest + React Testing Library (131 tests)
+- **Testing**: Vitest + React Testing Library (138 tests)
 - **Deployment**: Netlify (free tier)
 
 ## API Details
@@ -242,6 +254,7 @@ public holidays count as Sundays. 100 = a sunny summer Sunday afternoon.
 npm run dev          # Start Vite dev server (mock data)
 npm run build        # Build for production
 npm run typecheck    # Typecheck frontend + Netlify Function
+npm run verify       # Typecheck + run all tests (Netlify runs this before building)
 npm run preview      # Preview production build
 npm run netlify:dev  # Start Netlify dev server (with functions)
 npm test             # Run tests in watch mode

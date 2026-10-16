@@ -25,7 +25,7 @@ npm run build
 - **Entry point:** `src/main.tsx`
 - **Main app:** `src/App.tsx` (TypeScript, fully typed)
 - **Scoring logic:** `src/utils/scoring.ts` (exported, testable)
-- **Tests:** `src/utils/*.test.ts`, `netlify/**/*.test.ts` (131 tests)
+- **Tests:** `src/App.test.tsx`, `src/utils/*.test.ts`, `netlify/**/*.test.ts` (138 tests)
 
 ### Backend (Netlify Functions)
 - **Weather API:** `netlify/functions/weather.ts`
@@ -94,7 +94,8 @@ npm run test:run
 npm run test:ui
 ```
 
-**Test coverage (131 tests):**
+**Test coverage (138 tests):**
+- UI smoke test: renders, activity switch, detail sheet, production error state
 - All scoring functions, penalties, breakdown, generated explanations
 - Opening hours logic (monthly, Berlin time)
 - Crowd model incl. calibration against the 2014 visitor counts and observed peak times
@@ -103,6 +104,9 @@ npm run test:ui
 - Open-Meteo transform and the Netlify Function (cache, stale fallback, errors)
 
 Typecheck everything (the function has its own config): `npm run typecheck`
+
+`npm run verify` = typecheck + all tests. Netlify runs it before every build (production, deploy
+previews, branch deploys), so a red test blocks the deploy.
 
 ## Deployment
 
