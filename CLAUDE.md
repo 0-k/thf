@@ -21,7 +21,7 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
   `WeekOutlook`, `DaySection`, `HourCard`, `DetailModal` (score breakdown, bottom sheet on mobile),
   `ScoreExplainer` + `CrowdCurveChart`, `Footer`, small pieces (`ScoreDial`, `Runway`, `ActivityIcon`)
 - `src/utils/sky.ts` - Hero sky gradient by time of day (sunrise/sunset) and weather
-- `src/App.test.tsx` - UI smoke test (render, activity switch, modal, production error state)
+- `src/App.test.tsx` - UI smoke test (render, activity switch, modal + focus handling, auto-refresh, production error state)
 - `src/main.tsx` - React entry point (TypeScript)
 - `src/utils/scoring.ts` - Scoring engine + `SCORING_CONFIG` + generated explanations
 - `src/utils/crowd.ts` - Crowd model (calibrated to Grün Berlin visitor counts)
@@ -86,6 +86,8 @@ Air quality uses the real European AQI (CAMS) mapped onto the 1-5 config scale (
 5. Cache the fresh data (Blobs if available, otherwise in-memory). If Open-Meteo fails, serve the last
    good data up to 12 h old (`stale: true`); otherwise 502. Production never shows mock data.
 6. Frontend scores client-side (`scoreHour`) in Berlin time regardless of the viewer's timezone
+7. The page refetches by itself when the last attempt is ≥30 min old (`AUTO_REFRESH_MS`), checked every
+   minute and on `visibilitychange` (a tab reopened the next morning updates immediately)
 
 ### Layout
 Top to bottom: Hero → Departures → 7-Day Outlook → day sections → explainer → footer.
@@ -98,7 +100,8 @@ Top to bottom: Hero → Departures → 7-Day Outlook → day sections → explai
 - **Day sections:** 2-row grid per day (2x12 on desktop, 2x6 on mobile), hi/lo/rain/wind summary,
   best-window chip; 4 days shown, "Show 3 more days" toggle
 - **Hour cards:** time (10px; "Now" + amber ring), score, temp, wind, rain %, crowd dots; closed hours hatched
-- **Detail modal:** bottom sheet on mobile; score header, breakdown bars, weather tiles (wind arrow), AQI/UV/clouds
+- **Detail modal:** bottom sheet on mobile; score header, breakdown bars, weather tiles (wind arrow), AQI/UV/clouds; takes focus, traps Tab,
+  locks page scroll and returns focus to the opener on close
 - **Explainer:** factor cards generated from config + crowd-curve chart (hover tooltip, table view)
 
 ### Design System

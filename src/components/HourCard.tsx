@@ -23,7 +23,7 @@ interface HourCardProps {
 
 // Closed hours: light hatching, like a closed runway section
 const CLOSED_CLASSES =
-  'border-slate-200 text-slate-400 bg-[repeating-linear-gradient(135deg,#f1f5f9_0px,#f1f5f9_4px,#ffffff_4px,#ffffff_8px)]';
+  'border-slate-200 text-slate-500 bg-[repeating-linear-gradient(135deg,#f1f5f9_0px,#f1f5f9_4px,#ffffff_4px,#ffffff_8px)]';
 
 export default function HourCard({ hour, nowSeconds, onSelect }: HourCardProps): React.ReactElement {
   const status = hour.breakdown.status;

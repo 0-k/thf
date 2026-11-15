@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, RefreshCw, TriangleAlert } from 'lucide-react';
 import { getOpeningHours, scoreHour, type Activity, type HourData } from './utils/scoring';
 import { bestSlotOfDay, findBestSlots, type ScoredHour } from './utils/ranking';
@@ -44,6 +44,9 @@ interface ForecastMeta {
 const DEFAULT_DAYS = 4;
 const MAX_DAYS = 7;
 const ACTIVITY_STORAGE_KEY = 'thf.activity';
+// A page left open (or a phone tab reopened the next morning) refetches by itself.
+// The function caches for 1 h, so this costs at most one upstream call per hour.
+export const AUTO_REFRESH_MS = 30 * 60 * 1000;
 
 const readStoredActivity = (): Activity => {
   try {
@@ -73,11 +76,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
   const [scrollTarget, setScrollTarget] = useState<string | null>(null);
   const [nowSeconds, setNowSeconds] = useState<number>(nowInSeconds);
 
-  // Keep "now" fresh so past hours grey out and the current hour moves.
-  useEffect(() => {
-    const id = window.setInterval(() => setNowSeconds(nowInSeconds()), 60_000);
-    return () => window.clearInterval(id);
-  }, []);
+  const lastLoadAttempt = useRef<number>(0);
 
   useEffect(() => {
     try {
@@ -90,11 +89,13 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
   // Scroll after the target day has rendered (it may have just been expanded).
   useEffect(() => {
     if (!scrollTarget) return;
-    document.getElementById(`day-${scrollTarget}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    document.getElementById(`day-${scrollTarget}`)?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     setScrollTarget(null);
   }, [scrollTarget, showAllDays]);
 
   const loadForecast = useCallback(async (): Promise<void> => {
+    lastLoadAttempt.current = Date.now();
     setLoading(true);
     setError(null);
 
@@ -130,6 +131,24 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
 
   useEffect(() => {
     void loadForecast();
+  }, [loadForecast]);
+
+  // Keep "now" fresh so past hours grey out and the current hour moves, and
+  // refetch once the forecast is old. Background tabs throttle timers, so the
+  // same check runs the moment the tab becomes visible again.
+  useEffect(() => {
+    const tick = (): void => {
+      setNowSeconds(nowInSeconds());
+      if (document.visibilityState === 'visible' && Date.now() - lastLoadAttempt.current >= AUTO_REFRESH_MS) {
+        void loadForecast();
+      }
+    };
+    const id = window.setInterval(tick, 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, [loadForecast]);
 
   const todayStart = startOfBerlinDay(nowSeconds);
@@ -180,7 +199,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
   const today = berlinParts(nowSeconds);
   const todaySun = getSunTimes(today.year, today.month, today.day);
   const currentHour = scoredHours.find(h => h.dt <= nowSeconds && nowSeconds < h.dt + 3600) ?? null;
-  const nextOpen = scoredHours.find(h => h.dt >= currentHourStart && h.breakdown.status !== 'closed') ?? null;
+  const nextOpen = scoredHours.find(h => h.dt >= currentHourStart && h.breakdown.status === 'open') ?? null;
   const sky = skyPhase(today.hour + today.minute / 60, todaySun.sunrise, todaySun.sunset, currentHour?.clouds, currentHour?.pop);
 
   if (!forecastData) {
@@ -188,7 +207,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
       <div className={`min-h-screen flex flex-col items-center justify-center p-4 text-white ${SKY_GRADIENTS[sky]}`}>
         <div className="w-full max-w-md text-center">
           <span className="font-display font-extrabold tracking-[0.2em] bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-sm">THF</span>
-          <h1 className="font-display font-black text-5xl mt-4 leading-none tracking-tight">Tempelhofer Feld</h1>
+          <h1 className="font-display font-black text-[clamp(2.25rem,12.5vw,3rem)] mt-4 leading-none tracking-tight">Tempelhofer Feld</h1>
           {error ? (
             <div className="mt-6 rounded-3xl bg-black/25 ring-1 ring-white/15 p-6">
               <TriangleAlert className="w-10 h-10 text-amber-400 mx-auto mb-3" />
@@ -263,7 +282,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
           </div>
         )}
 
-        <BestTimes slots={bestSlots} activity={activity} nowSeconds={nowSeconds} onSelect={selectHour} />
+        <BestTimes slots={bestSlots} activity={activity} nowSeconds={nowSeconds} relativeLabel={relativeLabel} onSelect={selectHour} />
 
         <WeekOutlook
           days={dayGroups.map((day, i) => ({ day, best: dayBest[i] ?? null, relativeLabel: relativeLabel(day.key) }))}

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CloudSun, Droplets, Eye, Leaf, Navigation2, Sun, ThermometerSun, Users, Wind, X, Zap } from 'lucide-react';
 import type { ScoredHour } from '../utils/ranking';
 import type { Activity } from '../utils/types';
@@ -42,13 +42,45 @@ const Row = ({ icon, label, value }: { icon: React.ReactNode; label: string; val
 );
 
 export default function DetailModal({ hour, activity, onClose }: DetailModalProps): React.ReactElement {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      // Keep Tab inside the dialog while it is open.
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>('button, a[href], summary, [tabindex]:not([tabindex="-1"])');
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      const inside = dialogRef.current.contains(active);
+      if (e.shiftKey && (!inside || active === first || active === dialogRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (!inside || active === last)) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Move focus into the sheet, lock the page behind it, and hand focus back on close.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      opener?.focus({ preventScroll: true });
+    };
+  }, []);
 
   const { breakdown } = hour;
   const { crowd } = breakdown;
@@ -64,10 +96,12 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={`Details for ${formatLongDay(hour.dt)} ${formatHour(hour.dt)}`}
-        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto"
+        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92dvh] overflow-y-auto overscroll-contain outline-none"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Score header */}

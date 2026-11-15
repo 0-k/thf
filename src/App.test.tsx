@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import App from './App';
+import App, { AUTO_REFRESH_MS } from './App';
 import { generateMockWeatherData } from './utils/mockData';
 
 const okResponse = () => ({
@@ -51,6 +51,48 @@ describe('App (smoke)', () => {
     expect(within(dialog).getByText(/What.s holding it back/)).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('moves focus into the detail sheet, locks page scroll and restores both on close', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => okResponse()));
+    render(<App />);
+    await screen.findByText('Departures');
+    const departures = screen.getByText('Departures').closest('section')!;
+    const opener = within(departures).getAllByRole('button')[0]!;
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveFocus();
+    expect(document.body.style.overflow).toBe('hidden');
+    // Tab from the last control wraps to the first instead of leaving the sheet
+    const close = within(dialog).getByRole('button', { name: 'Close' });
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    fireEvent.click(close);
+    expect(document.body.style.overflow).toBe('');
+    expect(opener).toHaveFocus();
+  });
+
+  it('refetches a stale forecast when the tab becomes visible again', async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    await screen.findByText('Departures');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Coming back right away: nothing to do
+    fireEvent(document, new Event('visibilitychange'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const realNow = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(realNow + AUTO_REFRESH_MS + 1000);
+    try {
+      fireEvent(document, new Event('visibilitychange'));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+    await screen.findByText('Departures');
   });
 
   it('in production shows an error card instead of fake data when the API fails', async () => {

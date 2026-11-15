@@ -9,15 +9,10 @@ interface BestTimesProps {
   slots: Slot[];
   activity: Activity;
   nowSeconds: number;
+  /** "Today" / "Tomorrow" / null for a Berlin date key */
+  relativeLabel: (dateKey: string) => string | null;
   onSelect: (hour: ScoredHour) => void;
 }
-
-const relativeDay = (dt: number, nowSeconds: number): string => {
-  const key = berlinParts(dt).dateKey;
-  if (key === berlinParts(nowSeconds).dateKey) return 'Today';
-  if (key === berlinParts(nowSeconds + 86400).dateKey) return 'Tomorrow';
-  return `${formatWeekdayShort(dt)} ${formatShortDate(dt)}`;
-};
 
 const remark = (score: number, rank: number): { text: string; className: string } => {
   if (rank === 0 && score >= 70) return { text: 'Best bet', className: 'bg-amber-400 text-slate-900' };
@@ -27,7 +22,7 @@ const remark = (score: number, rank: number): { text: string; className: string 
 };
 
 /** "Departures" board: the best non-overlapping 2-hour windows. */
-export default function BestTimes({ slots, activity, nowSeconds, onSelect }: BestTimesProps): React.ReactElement {
+export default function BestTimes({ slots, activity, nowSeconds, relativeLabel, onSelect }: BestTimesProps): React.ReactElement {
   return (
     <section className="rounded-3xl bg-slate-900 text-white shadow-xl overflow-hidden ring-1 ring-black/10">
       <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10">
@@ -79,7 +74,7 @@ export default function BestTimes({ slots, activity, nowSeconds, onSelect }: Bes
                     >
                       {slot.score}
                     </span>
-                    <span className="font-display text-base font-bold text-white/90">{relativeDay(first.dt, nowSeconds)}</span>
+                    <span className="font-display text-base font-bold text-white/90">{relativeLabel(berlinParts(first.dt).dateKey) ?? `${formatWeekdayShort(first.dt)} ${formatShortDate(first.dt)}`}</span>
                     <span className="col-span-2 sm:col-span-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-white/75">
                       <span className="flex items-center gap-1"><ThermometerSun className="w-3.5 h-3.5" />{Math.round(avg(h => h.temp))}°C</span>
                       <span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5" />{Math.round(avg(h => h.wind_speed))} m/s</span>

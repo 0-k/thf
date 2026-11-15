@@ -60,13 +60,13 @@ function NowPanel({ current, nextOpen, nowSeconds, activityLabel }: {
   }
 
   return (
-    <div className="rounded-3xl bg-black/25 ring-1 ring-white/15 backdrop-blur-sm p-4 sm:p-5 flex items-center gap-4 sm:gap-5">
+    <div className="rounded-3xl bg-black/25 ring-1 ring-white/15 backdrop-blur-sm p-4 sm:p-5 flex items-center gap-3.5 sm:gap-5" aria-live="polite">
       <ScoreDial score={current?.score ?? 0} status={status} />
       <div className="min-w-0">
-        <div className="text-[11px] uppercase tracking-[0.2em] text-white/60">
+        <div className="text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white/60">
           Right now · {current ? `${formatHour(current.dt)}–${formatHour(current.dt + 3600)}` : formatClock(nowSeconds)}
         </div>
-        <div className="font-display text-3xl sm:text-4xl font-extrabold leading-tight">{headline}</div>
+        <div className="font-display text-[1.7rem] sm:text-4xl font-extrabold leading-tight">{headline}</div>
         <div className="text-sm text-white/80">{detail}</div>
         {current && (
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-white/90" aria-label={`Conditions for ${activityLabel}`}>
@@ -106,14 +106,14 @@ export default function Hero(props: HeroProps): React.ReactElement {
             disabled={loading}
             className="flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-60 px-3 py-1.5 text-sm font-medium backdrop-blur transition-colors shrink-0"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">Refresh</span>
           </button>
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div>
-            <h1 className="font-display font-black leading-[0.95] tracking-tight text-5xl sm:text-6xl md:text-7xl">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="min-w-0">
+            <h1 className="font-display font-black leading-[0.95] tracking-tight text-[clamp(2.25rem,12.5vw,3rem)] sm:text-6xl md:text-7xl">
               Tempelhofer<br />Feld
             </h1>
             <p className="mt-4 text-white/85 max-w-md">
