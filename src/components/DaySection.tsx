@@ -4,6 +4,7 @@ import type { ScoredHour, Slot } from '../utils/ranking';
 import { getScoreColor } from '../utils/display';
 import { formatHour, formatShortDate, formatWeekday } from '../utils/time';
 import HourCard from './HourCard';
+import { ThresholdKeys } from './Runway';
 
 export interface DayGroup {
   key: string;
@@ -41,6 +42,13 @@ interface DaySectionProps {
   onSelect: (hour: ScoredHour) => void;
 }
 
+const RunwayEnd = ({ label, flip = false }: { label: string; flip?: boolean }): React.ReactElement => (
+  <span aria-hidden="true" className={`hidden lg:flex items-center gap-2 text-white/80 ${flip ? 'flex-row-reverse' : ''}`}>
+    <ThresholdKeys count={4} className="h-12" />
+    <span className="font-display font-bold text-sm [font-stretch:80%]">{label}</span>
+  </span>
+);
+
 export default function DaySection({ day, relativeLabel, best, lessReliable, nowSeconds, onSelect }: DaySectionProps): React.ReactElement {
   // Split hours into two rows
   const midpoint = Math.ceil(day.hours.length / 2);
@@ -51,7 +59,7 @@ export default function DaySection({ day, relativeLabel, best, lessReliable, now
   const bestColors = best ? getScoreColor(best.score) : null;
 
   return (
-    <section id={`day-${day.key}`} className="scroll-mt-4 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
+    <section id={`day-${day.key}`} className="scroll-mt-4 rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 mb-4">
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -78,7 +86,7 @@ export default function DaySection({ day, relativeLabel, best, lessReliable, now
           <button
             type="button"
             onClick={() => onSelect(best.start)}
-            className="flex items-center gap-3 rounded-2xl border px-3 py-1.5 transition hover:shadow-md"
+            className="flex items-center gap-3 rounded-lg border px-3 py-1.5 transition hover:shadow-md"
             style={bestColors}
           >
             <span className="text-left leading-tight">
@@ -95,16 +103,17 @@ export default function DaySection({ day, relativeLabel, best, lessReliable, now
         <p className="text-xs text-slate-500 -mt-2 mb-3">Forecasts this far ahead are less reliable.</p>
       )}
 
-      <div className="space-y-2">
-        {/* First row */}
-        <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5 sm:gap-2">
-          {morningHours.map(hour => <HourCard key={hour.dt} hour={hour} nowSeconds={nowSeconds} onSelect={onSelect} />)}
-        </div>
-
-        {/* Second row */}
-        <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5 sm:gap-2">
-          {afternoonHours.map(hour => <HourCard key={hour.dt} hour={hour} nowSeconds={nowSeconds} onSelect={onSelect} />)}
-        </div>
+      {/* The two rows are the field's two parallel runways (2-row grid kept as is) */}
+      <div className="rounded-xl bg-tarmac p-2 sm:p-3 space-y-2">
+        {([[morningHours, '09L', '27R'], [afternoonHours, '09R', '27L']] as const).map(([rowHours, left, right]) => (
+          <div key={left} className="flex items-stretch gap-2.5">
+            <RunwayEnd label={left} />
+            <div className="flex-1 min-w-0 grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1 sm:gap-1.5">
+              {rowHours.map(hour => <HourCard key={hour.dt} hour={hour} nowSeconds={nowSeconds} onSelect={onSelect} />)}
+            </div>
+            <RunwayEnd label={right} flip />
+          </div>
+        ))}
       </div>
     </section>
   );

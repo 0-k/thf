@@ -17,10 +17,10 @@ Weather-based activity scoring app for Tempelhofer Feld in Berlin. Provides hour
 ## Key Files
 
 - `src/App.tsx` - Main React app: data loading, day grouping, layout
-- `src/components/` - `Hero` (live sky + "right now" dial + activity tabs), `BestTimes` ("Departures" board),
+- `src/components/` - `Hero` (field from above + "right now" dial + windsock + activity tabs), `BestTimes` ("Cleared for take-off"),
   `WeekOutlook`, `DaySection`, `HourCard`, `DetailModal` (score breakdown, bottom sheet on mobile),
-  `ScoreExplainer` + `CrowdCurveChart`, `Footer`, small pieces (`ScoreDial`, `Runway`, `ActivityIcon`)
-- `src/utils/sky.ts` - Hero sky gradient by time of day (sunrise/sunset) and weather
+  `ScoreExplainer` + `CrowdCurveChart`, `Footer`, small pieces (`ScoreDial`, `Runway`, `Windsock`, `ActivityIcon`)
+- `src/utils/sky.ts` - Hero grass tone by time of day (sunrise/sunset) and weather
 - `src/App.test.tsx` - UI smoke test (render, activity switch, modal + focus handling, auto-refresh, production error state)
 - `src/main.tsx` - React entry point (TypeScript)
 - `src/utils/scoring.ts` - Scoring engine + `SCORING_CONFIG` + generated explanations
@@ -100,26 +100,35 @@ Air quality uses the real European AQI (CAMS) mapped onto the 1-5 config scale (
    minute and on `visibilitychange` (a tab reopened the next morning updates immediately)
 
 ### Layout
-Top to bottom: Hero → Departures → 7-Day Outlook → day sections → explainer → footer.
-- **Hero:** sky gradient follows the real time of day/weather (`sky.ts`), "Right now" score dial for the
-  current hour (or "Field closed · opens …"), opening hours/sunset/update chips, activity tabs
-  (2x2 on mobile, 1x4 on desktop, remembered in localStorage), runway strip (09L/27R)
-- **Departures:** top 3 non-overlapping 2-hour windows (avg visit ≈ 2 h) from now to the end of day 4,
-  with conditions, remark and main drawback
-- **7-Day Outlook:** best window per day; tapping a day scrolls to it (expands days 5-7)
-- **Day sections:** 2-row grid per day (2x12 on desktop, 2x6 on mobile), hi/lo/rain/wind summary,
+Top to bottom: Hero → Cleared for take-off → Seven days → day sections → explainer → footer.
+- **Hero:** the field from above. Grass tone follows the real time of day/weather (`sky.ts`), runway strip
+  (09L/27R), "Right now" landing-circle dial for the current hour (or "Field closed · opens …"), windsock
+  (`Windsock.tsx`: one stripe per ~3 kn, like a real one), activity tabs (2x2 on mobile, 1x4 on desktop,
+  remembered in localStorage)
+- **Cleared for take-off** (`BestTimes`): top 3 non-overlapping 2-hour windows (avg visit ≈ 2 h) from now to
+  the end of day 4, ranked, with conditions and main drawback
+- **Seven days** (`WeekOutlook`): best window per day; tapping a day scrolls to it (expands days 5-7)
+- **Day sections:** 2-row grid per day (2x12 on desktop, 2x6 on mobile) on an asphalt panel: the two rows
+  are the two parallel runways (09L/27R, 09R/27L end markers on desktop). hi/lo/rain/wind summary,
   best-window chip; 4 days shown, "Show 3 more days" toggle
-- **Hour cards:** time (10px; "Now" + amber ring), score, temp, wind, rain %, crowd dots; closed hours hatched
+- **Hour cards:** time (10px; "Now" + orange outline and marker), score, temp, wind, rain %, crowd dots;
+  closed hours are hatched asphalt
 - **Detail modal:** bottom sheet on mobile; score header, breakdown bars, weather tiles (wind arrow), AQI/UV/clouds; takes focus, traps Tab,
   locks page scroll and returns focus to the opener on close
 - **Explainer:** factor cards generated from config + crowd-curve chart (hover tooltip, table view)
 
-### Design System
-- Ex-airport identity: dark navy "departures board", amber signage accent (`amber-400`), runway markings
-- Font: Nunito (rounded, friendly) for body and headings, **self-hosted** via `@fontsource-variable/nunito`
-  (no Google Fonts CDN: GDPR). Tailwind tokens `font-sans` / `font-display` (`@theme` in `index.css`);
-  headings in sentence case, extrabold/black weights
-- Score colors: continuous HSL green→yellow→red from `getScoreColor` (unchanged semantics)
+### Design System ("Airfield plan", 2026-11)
+- Identity: the ex-airfield seen from above, kept calm: mown grass, asphalt, white paint, and windsock
+  orange as the single accent. Chosen from three mockups; deliberately toned down (no saturated colour
+  blocks, no all-caps expanded headings), so keep it restrained.
+- Tokens in the `@theme` block of `index.css`: `meadow` (page), `field` / `field-deep` (hero grass),
+  `tarmac` / `tarmac-light`, `sock` / `sock-soft` (accent). White cards with `rounded-2xl` for sections,
+  `rounded-lg`/`rounded-md` inside.
+- Font: Archivo for body and headings, **self-hosted** via `@fontsource-variable/archivo` (`wdth.css`,
+  no font CDN: GDPR). Headings sentence case, extrabold; only the page title is slightly expanded
+  (`[font-stretch:112%]`), runway numbers condensed (`80%`).
+- Score colors: continuous HSL green→yellow→red from `getScoreColor` (unchanged semantics), used as the
+  fill of hour slabs, day tiles and score blocks
 - Crowd chart: categorical slots 1-3 of the validated dataviz palette (#2a78d6, #eb6834, #1baf7a),
   2px lines, direct labels + legend + table view (aqua is < 3:1 on white)
 

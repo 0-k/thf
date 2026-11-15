@@ -7,7 +7,7 @@ import { getHolidayName, getSunTimes } from './utils/calendar';
 import { berlinParts, formatClock, formatDay, startOfBerlinDay } from './utils/time';
 import { ACTIVITIES } from './utils/display';
 import { SKY_GRADIENTS, skyPhase } from './utils/sky';
-import Hero from './components/Hero';
+import Hero, { MOWN_STRIPES } from './components/Hero';
 import BestTimes from './components/BestTimes';
 import WeekOutlook from './components/WeekOutlook';
 import DaySection, { type DayGroup } from './components/DaySection';
@@ -204,19 +204,20 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
 
   if (!forecastData) {
     return (
-      <div className={`min-h-screen flex flex-col items-center justify-center p-4 text-white ${SKY_GRADIENTS[sky]}`}>
-        <div className="w-full max-w-md text-center">
-          <span className="font-display font-extrabold tracking-[0.2em] bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-sm">THF</span>
-          <h1 className="font-display font-black text-[clamp(2.25rem,12.5vw,3rem)] mt-4 leading-none tracking-tight">Tempelhofer Feld</h1>
+      <div className={`relative min-h-screen flex flex-col items-center justify-center p-4 text-white ${SKY_GRADIENTS[sky]}`}>
+        <div aria-hidden="true" className={`pointer-events-none absolute inset-0 ${MOWN_STRIPES}`} />
+        <div className="relative w-full max-w-md text-center">
+          <span className="text-[11px] uppercase tracking-[0.14em] text-white/75"><span className="font-bold text-white">THF</span> · Berlin</span>
+          <h1 className="font-display font-extrabold [font-stretch:112%] text-[clamp(2.1rem,10.5vw,3rem)] mt-3 leading-none tracking-tight">Tempelhofer Feld</h1>
           {error ? (
-            <div className="mt-6 rounded-3xl bg-black/25 ring-1 ring-white/15 p-6">
-              <TriangleAlert className="w-10 h-10 text-amber-400 mx-auto mb-3" />
+            <div className="mt-6 rounded-xl bg-black/25 ring-1 ring-white/15 p-6">
+              <TriangleAlert className="w-10 h-10 text-orange-300 mx-auto mb-3" />
               <p className="font-display text-2xl font-extrabold">Couldn&apos;t load the forecast</p>
               <p className="text-sm text-white/80 mt-1 mb-4">The weather service is unavailable right now ({error}).</p>
               <button
                 onClick={() => void loadForecast()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-400 text-slate-900 font-semibold hover:bg-amber-300 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-sock text-white font-semibold hover:brightness-110 disabled:opacity-60 transition-colors"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Try again
@@ -229,7 +230,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
             </div>
           )}
         </div>
-        <Runway className="w-full max-w-md mt-8 opacity-70" />
+        <Runway className="relative w-full max-w-md mt-8 rounded-md" />
       </div>
     );
   }
@@ -246,7 +247,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-3 py-3 sm:px-4 sm:py-5">
+    <div className="min-h-screen bg-meadow px-3 py-3 sm:px-4 sm:py-5">
       {selectedHour && <DetailModal hour={selectedHour} activity={activity} onClose={closeModal} />}
 
       <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5">
@@ -282,7 +283,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
           </div>
         )}
 
-        <BestTimes slots={bestSlots} activity={activity} nowSeconds={nowSeconds} relativeLabel={relativeLabel} onSelect={selectHour} />
+        <BestTimes slots={bestSlots} activity={activity} relativeLabel={relativeLabel} onSelect={selectHour} />
 
         <WeekOutlook
           days={dayGroups.map((day, i) => ({ day, best: dayBest[i] ?? null, relativeLabel: relativeLabel(day.key) }))}
@@ -307,7 +308,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
           <div className="flex justify-center">
             <button
               onClick={() => setShowAllDays(v => !v)}
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-slate-900 text-white font-display text-base font-bold shadow hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-tarmac text-white font-display text-base font-bold shadow hover:bg-tarmac-light transition-colors"
             >
               <ChevronDown className={`w-5 h-5 transition-transform ${showAllDays ? 'rotate-180' : ''}`} />
               {showAllDays ? 'Show fewer days' : `Show ${hiddenDays} more day${hiddenDays > 1 ? 's' : ''}`}

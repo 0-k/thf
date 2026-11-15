@@ -1,9 +1,18 @@
 @import "tailwindcss";
 
-/* Theme tokens (Tailwind config, not custom styling): self-hosted Nunito for body and headings */
+/* Theme tokens (Tailwind config, not custom styling).
+   "Airfield plan": the field from above - mown grass, asphalt, white paint, windsock orange.
+   Self-hosted Archivo for body and headings (no font CDN: GDPR). */
 @theme {
-  --font-sans: "Nunito Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Nunito Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-meadow: #edf1e8;      /* page background: pale grass */
+  --color-field: #35693d;       /* hero grass */
+  --color-field-deep: #264a2d;
+  --color-tarmac: #2b2d30;      /* runways, hour strips, footer */
+  --color-tarmac-light: #3a3d41;
+  --color-sock: #ea6a1f;        /* windsock orange: the one accent */
+  --color-sock-soft: #fdebdc;
 }
 
 body {

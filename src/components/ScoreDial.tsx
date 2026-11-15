@@ -27,8 +27,8 @@ export default function ScoreDial({ score, status, tone = 'dark', size = 'lg' }:
     >
       <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
         <circle
-          cx="50" cy="50" r={RADIUS} fill="none" strokeWidth="8"
-          className={tone === 'dark' ? 'stroke-white/15' : 'stroke-slate-200'}
+          cx="50" cy="50" r={RADIUS} fill="none" strokeWidth="7"
+          className={tone === 'dark' ? 'stroke-white/30' : 'stroke-slate-200'}
         />
         {open && score > 0 && (
           <circle

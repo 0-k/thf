@@ -1,5 +1,5 @@
 /**
- * Hero "sky" that follows the real time of day and weather at the field.
+ * Hero light (grass tone) that follows the real time of day and weather at the field.
  * Class strings are complete literals so Tailwind can see them.
  */
 
@@ -15,13 +15,14 @@ export const skyPhase = (hour: number, sunrise: number, sunset: number, clouds?:
   return 'day';
 };
 
+// The hero is the field seen from above, so the "sky" shows as the light on the grass.
 export const SKY_GRADIENTS: Record<SkyPhase, string> = {
-  night: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900',
-  dawn: 'bg-gradient-to-br from-indigo-900 via-rose-700 to-amber-500',
-  day: 'bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-800',
-  overcast: 'bg-gradient-to-br from-slate-500 via-slate-600 to-slate-800',
-  rain: 'bg-gradient-to-br from-slate-700 via-slate-800 to-blue-950',
-  dusk: 'bg-gradient-to-br from-indigo-950 via-fuchsia-800 to-orange-500',
+  night: 'bg-gradient-to-br from-[#14231a] via-[#182b20] to-[#101a16]',
+  dawn: 'bg-gradient-to-br from-[#2b4a3a] via-[#3f6442] to-[#7d7440]',
+  day: 'bg-gradient-to-br from-[#3a7142] via-[#35693d] to-[#2c5a35]',
+  overcast: 'bg-gradient-to-br from-[#4d6650] via-[#465d49] to-[#3b5040]',
+  rain: 'bg-gradient-to-br from-[#36493c] via-[#2f4136] to-[#27372f]',
+  dusk: 'bg-gradient-to-br from-[#284334] via-[#3d5a3c] to-[#8a6238]',
 };
 
 export const SKY_LABELS: Record<SkyPhase, string> = {

@@ -25,9 +25,9 @@ describe('App (smoke)', () => {
   it('renders the hero, departures board, outlook and day sections', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => okResponse()));
     render(<App />);
-    expect(await screen.findByText('Departures')).toBeInTheDocument();
+    expect(await screen.findByText('Cleared for take-off')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Tempelhofer/i);
-    expect(screen.getByText('7-Day Outlook')).toBeInTheDocument();
+    expect(screen.getByText('Seven days')).toBeInTheDocument();
     expect(screen.getAllByText('Today').length).toBeGreaterThan(0);
     expect(screen.getByText(/Show 3 more days/)).toBeInTheDocument();
   });
@@ -35,7 +35,7 @@ describe('App (smoke)', () => {
   it('switches activity and remembers it', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => okResponse()));
     render(<App />);
-    await screen.findByText('Departures');
+    await screen.findByText('Cleared for take-off');
     fireEvent.click(screen.getByRole('button', { name: /kiting/i }));
     expect(screen.getByText(/Kiting forecast for Berlin/)).toBeInTheDocument();
     expect(window.localStorage.getItem('thf.activity')).toBe('kiting');
@@ -44,8 +44,8 @@ describe('App (smoke)', () => {
   it('opens the detail sheet with a breakdown and closes it on Escape', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => okResponse()));
     render(<App />);
-    await screen.findByText('Departures');
-    const departures = screen.getByText('Departures').closest('section')!;
+    await screen.findByText('Cleared for take-off');
+    const departures = screen.getByText('Cleared for take-off').closest('section')!;
     fireEvent.click(within(departures).getAllByRole('button')[0]!);
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/What.s holding it back/)).toBeInTheDocument();
@@ -56,8 +56,8 @@ describe('App (smoke)', () => {
   it('moves focus into the detail sheet, locks page scroll and restores both on close', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => okResponse()));
     render(<App />);
-    await screen.findByText('Departures');
-    const departures = screen.getByText('Departures').closest('section')!;
+    await screen.findByText('Cleared for take-off');
+    const departures = screen.getByText('Cleared for take-off').closest('section')!;
     const opener = within(departures).getAllByRole('button')[0]!;
     opener.focus();
     fireEvent.click(opener);
@@ -77,7 +77,7 @@ describe('App (smoke)', () => {
     const fetchMock = vi.fn(async () => okResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<App />);
-    await screen.findByText('Departures');
+    await screen.findByText('Cleared for take-off');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     // Coming back right away: nothing to do
@@ -92,7 +92,7 @@ describe('App (smoke)', () => {
     } finally {
       nowSpy.mockRestore();
     }
-    await screen.findByText('Departures');
+    await screen.findByText('Cleared for take-off');
   });
 
   it('in production shows an error card instead of fake data when the API fails', async () => {

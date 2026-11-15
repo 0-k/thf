@@ -24,7 +24,7 @@ interface DetailModalProps {
 const Tile = ({ icon, title, value, sub }: {
   icon: React.ReactNode; title: string; value: React.ReactNode; sub?: string | undefined;
 }): React.ReactElement => (
-  <div className="rounded-2xl bg-slate-50 ring-1 ring-slate-100 p-3">
+  <div className="rounded-lg bg-slate-50 ring-1 ring-slate-100 p-3">
     <div className="flex items-center gap-1.5 text-slate-500 mb-1">
       {icon}
       <span className="text-[11px] font-medium uppercase tracking-wider">{title}</span>
@@ -101,11 +101,11 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
         role="dialog"
         aria-modal="true"
         aria-label={`Details for ${formatLongDay(hour.dt)} ${formatHour(hour.dt)}`}
-        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92dvh] overflow-y-auto overscroll-contain outline-none"
+        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92dvh] overflow-y-auto overscroll-contain outline-none"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Score header */}
-        <div className="relative px-5 pt-5 pb-4 sm:rounded-t-3xl rounded-t-3xl" style={{ backgroundColor: colors.backgroundColor, color: colors.color }}>
+        <div className="relative px-5 pt-5 pb-4 sm:rounded-t-2xl rounded-t-2xl" style={{ backgroundColor: colors.backgroundColor, color: colors.color }}>
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15 sm:hidden" aria-hidden="true" />
           <button
             onClick={onClose}
@@ -166,7 +166,7 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
                       </span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full mt-1">
-                      <div className="h-1.5 bg-rose-400 rounded-full" style={{ width: `${(p.points / maxPoints) * 100}%` }} />
+                      <div className="h-1.5 bg-sock rounded-full" style={{ width: `${(p.points / maxPoints) * 100}%` }} />
                     </div>
                   </li>
                 ))}
