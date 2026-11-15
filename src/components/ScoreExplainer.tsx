@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, CloudRain, Leaf, Snowflake, Sun, Thermometer, Users, Wind, Zap } from 'lucide-react';
+import { Cloud, CloudRain, Leaf, Moon, Snowflake, Sun, Thermometer, Users, Wind, Zap } from 'lucide-react';
 import type { Activity } from '../utils/types';
 import { explainActivity } from '../utils/scoring';
 import { ACTIVITY_LABELS } from '../utils/display';
@@ -21,6 +21,7 @@ const FACTOR_ICONS: Record<string, React.ReactNode> = {
   UV: <Sun className="w-4 h-4" />,
   'Air quality': <Leaf className="w-4 h-4" />,
   'No sun': <Cloud className="w-4 h-4" />,
+  Darkness: <Moon className="w-4 h-4" />,
 };
 
 export default function ScoreExplainer({ activity, today }: ScoreExplainerProps): React.ReactElement {
