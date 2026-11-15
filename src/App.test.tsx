@@ -26,7 +26,7 @@ describe('App (smoke)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => okResponse()));
     render(<App />);
     expect(await screen.findByText('Cleared for take-off')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Tempelhofer/i);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Tempel.?hofer Feld/i);
     expect(screen.getByText('Seven days')).toBeInTheDocument();
     expect(screen.getAllByText('Today').length).toBeGreaterThan(0);
     expect(screen.getByText(/Show 3 more days/)).toBeInTheDocument();
@@ -37,7 +37,7 @@ describe('App (smoke)', () => {
     render(<App />);
     await screen.findByText('Cleared for take-off');
     fireEvent.click(screen.getByRole('button', { name: /kiting/i }));
-    expect(screen.getByText(/Kiting forecast for Berlin/)).toBeInTheDocument();
+    expect(screen.getByText(/windows for kiting/)).toBeInTheDocument();
     expect(window.localStorage.getItem('thf.activity')).toBe('kiting');
   });
 

@@ -6,8 +6,7 @@ import { generateMockWeatherData } from './utils/mockData';
 import { getHolidayName, getSunTimes } from './utils/calendar';
 import { berlinParts, formatClock, formatDay, startOfBerlinDay } from './utils/time';
 import { ACTIVITIES } from './utils/display';
-import { SKY_GRADIENTS, skyPhase } from './utils/sky';
-import Hero, { MOWN_STRIPES } from './components/Hero';
+import Hero from './components/Hero';
 import BestTimes from './components/BestTimes';
 import WeekOutlook from './components/WeekOutlook';
 import DaySection, { type DayGroup } from './components/DaySection';
@@ -57,6 +56,9 @@ const readStoredActivity = (): Activity => {
   }
   return 'cycling';
 };
+
+/** Faint mowing stripes across the grass */
+const MOWN_STRIPES = 'bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.035)_0px,rgba(255,255,255,0.035)_46px,transparent_46px,transparent_92px)]';
 
 const nowInSeconds = (): number => Math.floor(Date.now() / 1000);
 
@@ -200,37 +202,39 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
   const todaySun = getSunTimes(today.year, today.month, today.day);
   const currentHour = scoredHours.find(h => h.dt <= nowSeconds && nowSeconds < h.dt + 3600) ?? null;
   const nextOpen = scoredHours.find(h => h.dt >= currentHourStart && h.breakdown.status === 'open') ?? null;
-  const sky = skyPhase(today.hour + today.minute / 60, todaySun.sunrise, todaySun.sunset, currentHour?.clouds, currentHour?.pop);
 
   if (!forecastData) {
     return (
-      <div className={`relative min-h-screen flex flex-col items-center justify-center p-4 text-white ${SKY_GRADIENTS[sky]}`}>
-        <div aria-hidden="true" className={`pointer-events-none absolute inset-0 ${MOWN_STRIPES}`} />
-        <div className="relative w-full max-w-md text-center">
-          <span className="text-[11px] uppercase tracking-[0.14em] text-white/75"><span className="font-bold text-white">THF</span> · Berlin</span>
-          <h1 className="font-display font-extrabold [font-stretch:112%] text-[clamp(2.1rem,10.5vw,3rem)] mt-3 leading-none tracking-tight">Tempelhofer Feld</h1>
+      <div className={`min-h-screen flex flex-col justify-center px-4 py-8 text-white bg-field ${MOWN_STRIPES}`}>
+        <div className="w-full max-w-3xl mx-auto">
+          <div className="text-xs uppercase tracking-[0.12em]">THF · EDDI · 52.47°N 13.41°E</div>
+          <h1 className="mt-3 font-display font-black uppercase [font-stretch:125%] leading-[0.84] tracking-[-0.02em] text-[clamp(2.2rem,9.4vw,5rem)]">
+            Tempel&shy;hofer Feld
+          </h1>
+          <Runway className="mt-6" />
           {error ? (
-            <div className="mt-6 rounded-xl bg-black/25 ring-1 ring-white/15 p-6">
-              <TriangleAlert className="w-10 h-10 text-orange-300 mx-auto mb-3" />
-              <p className="font-display text-2xl font-extrabold">Couldn&apos;t load the forecast</p>
-              <p className="text-sm text-white/80 mt-1 mb-4">The weather service is unavailable right now ({error}).</p>
+            <div className="mt-6 bg-white text-ink p-5">
+              <p className="flex items-center gap-2 font-display text-xl font-black uppercase [font-stretch:110%] leading-none">
+                <TriangleAlert className="w-6 h-6 text-sock shrink-0" aria-hidden="true" />
+                Couldn&apos;t load the forecast
+              </p>
+              <p className="text-sm mt-2 mb-4">The weather service is unavailable right now ({error}).</p>
               <button
                 onClick={() => void loadForecast()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-sock text-white font-semibold hover:brightness-110 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-sock text-ink font-display font-extrabold uppercase tracking-wide hover:brightness-110 disabled:opacity-60 transition"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Try again
               </button>
             </div>
           ) : (
-            <div className="mt-6 flex items-center justify-center gap-2 text-white/80">
+            <div className="mt-6 flex items-center gap-2 text-sm uppercase tracking-[0.12em]">
               <RefreshCw className="w-5 h-5 animate-spin" />
               <span>Loading forecast…</span>
             </div>
           )}
         </div>
-        <Runway className="relative w-full max-w-md mt-8 rounded-md" />
       </div>
     );
   }
@@ -247,10 +251,10 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
   };
 
   return (
-    <div className="min-h-screen bg-meadow px-3 py-3 sm:px-4 sm:py-5">
+    <div className={`min-h-screen bg-field px-4 py-5 sm:px-6 sm:py-6 ${MOWN_STRIPES}`}>
       {selectedHour && <DetailModal hour={selectedHour} activity={activity} onClose={closeModal} />}
 
-      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5">
+      <div className="max-w-6xl mx-auto space-y-7">
         <Hero
           activity={activity}
           onActivityChange={setActivity}
@@ -259,7 +263,6 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
           nowSeconds={nowSeconds}
           todayHours={getOpeningHours(new Date(nowSeconds * 1000))}
           sunset={todaySun.sunset}
-          sky={sky}
           fetchedAt={meta.fetchedAt}
           showUpdated={!usingMockData}
           loading={loading}
@@ -267,18 +270,18 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
         />
 
         {usingMockData && (
-          <div className="rounded-2xl bg-yellow-50 ring-1 ring-yellow-200 px-4 py-3 text-sm text-yellow-900">
+          <div className="bg-white text-ink px-4 py-3 text-sm">
             <strong>Mock Data:</strong> Using simulated weather data. Run <code>npm run netlify:dev</code> to see real forecasts.
           </div>
         )}
         {meta.stale && (
-          <div className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 px-4 py-3 text-sm text-amber-900">
+          <div className="bg-white text-ink border-l-[10px] border-sock px-4 py-3 text-sm">
             The weather service is unreachable, so this is the last saved forecast
             {meta.fetchedAt !== null && <> from {formatClock(meta.fetchedAt)}</>}.
           </div>
         )}
         {error && (
-          <div className="rounded-2xl bg-red-50 ring-1 ring-red-200 px-4 py-3 text-sm text-red-800">
+          <div className="bg-white text-ink border-l-[10px] border-red-600 px-4 py-3 text-sm">
             Refresh failed ({error}). Showing the previous forecast.
           </div>
         )}
@@ -308,7 +311,7 @@ export default function TempelhoferBikeForecast(): React.ReactElement {
           <div className="flex justify-center">
             <button
               onClick={() => setShowAllDays(v => !v)}
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-tarmac text-white font-display text-base font-bold shadow hover:bg-tarmac-light transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2.5 border-[3px] border-white text-white font-display text-[15px] font-extrabold uppercase tracking-wide hover:bg-white hover:text-field transition-colors"
             >
               <ChevronDown className={`w-5 h-5 transition-transform ${showAllDays ? 'rotate-180' : ''}`} />
               {showAllDays ? 'Show fewer days' : `Show ${hiddenDays} more day${hiddenDays > 1 ? 's' : ''}`}

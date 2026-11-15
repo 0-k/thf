@@ -29,11 +29,11 @@ export default function ScoreExplainer({ activity, today }: ScoreExplainerProps)
   const rows = explainActivity(activity);
 
   return (
-    <section className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-6">
-      <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-slate-900">
+    <section className="bg-white text-ink p-5 sm:p-6">
+      <h2 className="font-display text-2xl font-black uppercase [font-stretch:110%] leading-none">
         How the {ACTIVITY_LABELS[activity]} score works
       </h2>
-      <p className="text-sm text-slate-600 mt-1 max-w-2xl">
+      <p className="text-sm text-ink/80 mt-2 max-w-2xl">
         Every hour starts at <strong>100 points</strong> and loses points for each condition working against you,
         on continuous scales. Tap any hour to see exactly which ones.
       </p>
@@ -41,27 +41,27 @@ export default function ScoreExplainer({ activity, today }: ScoreExplainerProps)
       <div className="mt-5 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {rows.map(row => (
-            <li key={row.title} className="rounded-lg ring-1 ring-slate-200 p-3">
+            <li key={row.title} className="border-2 border-ink/15 p-3">
               <div className="flex items-center gap-2">
-                <span className="rounded-lg bg-slate-100 text-slate-600 p-1.5">{FACTOR_ICONS[row.title] ?? null}</span>
-                <span className="font-display text-base font-extrabold text-slate-900">{row.title}</span>
+                <span className="bg-ink text-white p-1.5">{FACTOR_ICONS[row.title] ?? null}</span>
+                <span className="font-display text-base font-extrabold uppercase">{row.title}</span>
               </div>
-              <p className="text-sm text-slate-700 mt-1.5">{row.rule}</p>
-              <p className="text-xs text-slate-500 mt-1">{row.examples}</p>
+              <p className="text-sm mt-1.5">{row.rule}</p>
+              <p className="text-xs text-ink/70 mt-1">{row.examples}</p>
             </li>
           ))}
         </ul>
 
-        <div className="rounded-xl bg-meadow ring-1 ring-slate-200 p-4">
-          <h3 className="font-display text-xl font-extrabold text-slate-900">How crowds are estimated</h3>
-          <p className="text-sm text-slate-700 mt-1">
+        <div className="bg-tarmac text-white p-4">
+          <h3 className="font-display text-xl font-black uppercase [font-stretch:110%] leading-none">How crowds are estimated</h3>
+          <p className="text-sm text-white/90 mt-2">
             There is no live visitor count, so crowds are modelled: <strong>day type</strong> × <strong>time of day</strong>{' '}
             (peaks follow sunset) × <strong>weather</strong> (warmth, rain, sunshine, wind).
           </p>
-          <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+          <div className="mt-3 bg-white text-ink p-3">
             <CrowdCurveChart year={today.year} month={today.month} day={today.day} />
           </div>
-          <p className="text-xs text-slate-600 mt-3">
+          <p className="text-xs text-white/80 mt-3">
             Calibrated to Grün Berlin&apos;s visitor counts (2014: ~12,600 visits on weekdays, ~25,600 on Saturdays,
             ~31,000 on Sundays; peaks around 16:30 on weekdays and 14:00–14:30 at weekends). 100 = a sunny summer
             Sunday afternoon. Treat it as a rough guide.

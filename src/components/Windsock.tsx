@@ -20,8 +20,8 @@ export default function Windsock({ speed, className = '' }: { speed: number; cla
           <path
             key={i}
             d={`M${x} ${top} L${x + 22} ${top + 2.2} L${x + 22} ${bottom - 2.2} L${x} ${bottom} Z`}
-            fill={i % 2 === 0 ? '#ea6a1f' : '#ffffff'}
-            opacity={i < filled ? 1 : 0.25}
+            fill={i % 2 === 0 ? '#ff6a13' : '#ffffff'}
+            opacity={i < filled ? 1 : 0.28}
           />
         );
       })}

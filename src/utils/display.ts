@@ -20,49 +20,26 @@ export const ACTIVITY_LABELS: Record<Activity, string> = {
   socializing: 'Picnic',
 };
 
-/** Icon colour for the active activity tab */
-export const ACTIVITY_ACCENT_TEXT: Record<Activity, string> = {
-  cycling: 'text-blue-600',
-  jogging: 'text-emerald-600',
-  kiting: 'text-violet-600',
-  socializing: 'text-orange-500',
-};
-
 export const CLOSED_COLORS: ScoreColor = {
-  backgroundColor: 'rgb(229, 231, 235)',
-  borderColor: 'rgb(156, 163, 175)',
-  color: 'rgb(55, 65, 81)',
+  backgroundColor: '#3a3d41',
+  borderColor: '#2a2c2f',
+  color: '#ffffff',
 };
 
+/** Hue of the continuous score scale: green (100) → yellow (70) → orange (35) → red (0). */
+export const scoreHue = (score: number): number => {
+  if (score >= 70) return 60 + ((score - 70) / 30) * 60;
+  if (score >= 35) return 30 + ((score - 35) / 35) * 30;
+  return (Math.max(0, score) / 35) * 30;
+};
+
+/** Flat paint colour for a score: saturated fill, near-black text (>= 4.5:1 across the scale). */
 export const getScoreColor = (score: number): ScoreColor => {
-  // Continuous gradient from green (100) → yellow (70) → red (0)
-  // Using HSL for smooth color transitions
-  let hue: number, saturation: number, lightness: number;
-
-  if (score >= 70) {
-    // Green to Yellow (100 → 70)
-    const t = (score - 70) / 30;
-    hue = 60 + t * 60;
-    saturation = 65;
-    lightness = 75;
-  } else if (score >= 35) {
-    // Yellow to Orange (70 → 35)
-    const t = (score - 35) / 35;
-    hue = 30 + t * 30;
-    saturation = 70;
-    lightness = 72;
-  } else {
-    // Orange to Red (35 → 0)
-    const t = score / 35;
-    hue = 0 + t * 30;
-    saturation = 75;
-    lightness = 70;
-  }
-
+  const hue = scoreHue(score);
   return {
-    backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-    borderColor: `hsl(${hue}, ${saturation + 10}%, ${lightness - 20}%)`,
-    color: `hsl(${hue}, ${saturation}%, 25%)`
+    backgroundColor: `hsl(${hue}, 82%, 58%)`,
+    borderColor: `hsl(${hue}, 82%, 40%)`,
+    color: '#15171a',
   };
 };
 
@@ -102,3 +79,8 @@ const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 /** Wind "from" direction, e.g. 250° -> "W" */
 export const compassDirection = (degrees: number): string =>
   COMPASS[Math.round((((degrees % 360) + 360) % 360) / 45) % 8] ?? 'N';
+
+/** Poster headings: Archivo black, expanded, uppercase */
+export const HEADING = 'font-display font-black uppercase [font-stretch:110%] leading-none';
+/** Small spaced label */
+export const LABEL = 'text-[11px] sm:text-xs uppercase tracking-[0.12em]';
