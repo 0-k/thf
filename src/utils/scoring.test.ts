@@ -6,6 +6,7 @@ import {
   isOpen,
   isOpenAt,
   scoreHour,
+  darkShare,
   explainActivity,
   aqiLevel,
   kitingWindPenalty,
@@ -741,5 +742,79 @@ describe('explainActivity', () => {
     const rain = explainActivity('cycling').find(r => r.title === 'Rain')!;
     const expected = Math.round(Math.pow(0.5, SCORING_CONFIG.cycling.rain.exponent) * SCORING_CONFIG.cycling.rain.maxPenalty);
     expect(rain.examples).toContain(`50% = -${expected}`);
+  });
+});
+
+describe('Sanity of extremes (2026-11 audit)', () => {
+  // 2026: Jul 15 = Wednesday, Nov 17 = Tuesday, Jan 13 = Tuesday
+  const mk = (month: number, day: number, hour: number, o: Partial<HourData> = {}): HourData => ({
+    dt: berlinToUnix(2026, month, day, hour), temp: 20, wind_speed: 3, pop: 0, clouds: 10, uvi: 2,
+    weather: [{ main: 'Clear', description: 'clear sky' }], hasThunderstorm: false, ...o,
+  });
+  const ALL: Activity[] = ['cycling', 'jogging', 'kiting', 'socializing'];
+  const points = (activity: Activity, hour: HourData, factor: string): number =>
+    scoreHour(activity, hour).penalties.find(p => p.factor === factor)?.points ?? 0;
+
+  it('darkness costs every activity, most for picnic and kiting', () => {
+    const night = mk(6, 15, 22, { temp: 18, uvi: 0 }); // sunset ~21:20
+    const noon = mk(6, 15, 12, { temp: 18, uvi: 0 });
+    for (const a of ALL) {
+      expect(points(a, night, 'darkness')).toBe(SCORING_CONFIG[a].darkness.maxPenalty);
+      expect(points(a, noon, 'darkness')).toBe(0);
+    }
+    expect(scoreHour('socializing', night).score).toBeLessThan(55);
+    expect(scoreHour('cycling', night).score).toBeGreaterThan(75);
+  });
+
+  it('a dark November evening no longer beats the grey afternoon for a picnic', () => {
+    const afternoon = scoreHour('socializing', mk(10, 17, 13, { temp: 8, clouds: 100, uvi: 0.5 })).score;
+    const evening = scoreHour('socializing', mk(10, 17, 17, { temp: 7, clouds: 100, uvi: 0 })).score;
+    expect(evening).toBeLessThan(afternoon);
+  });
+
+  it('darkness fades in through twilight (no step at sunset)', () => {
+    const shares = [15, 16, 17].map(h => darkShare(berlinToUnix(2026, 10, 17, h))); // sunset ~16:13
+    expect(shares[0]).toBe(0);
+    expect(shares[1]).toBeGreaterThan(0);
+    expect(shares[1]).toBeLessThan(1);
+    expect(shares[2]).toBe(1);
+  });
+
+  it('hard frost is worse than 0°C (cold no longer flattens out)', () => {
+    for (const a of ALL) {
+      const zero = points(a, mk(0, 13, 13, { temp: 0, wind_speed: 7 }), 'cold');
+      const frost = points(a, mk(0, 13, 13, { temp: -8, wind_speed: 7 }), 'cold');
+      expect(frost).toBeGreaterThan(zero + 10);
+    }
+    expect(scoreHour('socializing', mk(0, 13, 13, { temp: 0 })).score).toBeLessThan(50);
+  });
+
+  it('keeps the tuned cold and wind values inside the old ranges', () => {
+    expect(points('cycling', mk(6, 15, 10, { temp: 0 }), 'cold')).toBeCloseTo(40, 0);
+    expect(points('jogging', mk(6, 15, 10, { temp: 0 }), 'cold')).toBeCloseTo(20, 0);
+    expect(points('kiting', mk(6, 15, 10, { temp: 0, wind_speed: 8 }), 'cold')).toBeCloseTo(40, 0);
+    expect(points('cycling', mk(6, 15, 10, { wind_speed: 10 }), 'wind')).toBeCloseTo(40, 0);
+    expect(points('cycling', mk(6, 15, 10, { wind_speed: 7 }), 'wind')).toBeCloseTo(19.3, 0);
+    expect(points('jogging', mk(6, 15, 10, { wind_speed: 13 }), 'wind')).toBeCloseTo(15, 0);
+  });
+
+  it('a gale is poor for everything (wind no longer flattens out at 10 m/s)', () => {
+    const gale = mk(6, 15, 10, { wind_speed: 18, wind_gust: 28 });
+    for (const a of ALL) expect(scoreHour(a, gale).score).toBeLessThan(40);
+    expect(points('cycling', gale, 'wind')).toBeGreaterThan(points('cycling', mk(6, 15, 10, { wind_speed: 10 }), 'wind'));
+  });
+
+  it('strong gusts cost points even when the mean wind is light', () => {
+    expect(points('cycling', mk(6, 15, 10, { wind_speed: 4, wind_gust: 18 }), 'gusts')).toBeGreaterThan(10);
+    expect(points('cycling', mk(6, 15, 10, { wind_speed: 6, wind_gust: 11 }), 'gusts')).toBe(0);
+  });
+
+  it('counts measured rain even when the probability is missing (0%)', () => {
+    expect(points('cycling', mk(6, 15, 10, { pop: 0, rain: { '1h': 3 } }), 'rain')).toBeGreaterThan(10);
+    expect(points('cycling', mk(6, 15, 10, { pop: 0 }), 'rain')).toBe(0);
+  });
+
+  it('a downpour is poor for cycling', () => {
+    expect(scoreHour('cycling', mk(6, 15, 10, { pop: 1, rain: { '1h': 6 }, clouds: 100 })).score).toBeLessThan(35);
   });
 });

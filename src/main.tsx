@@ -1,7 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
-import '@fontsource-variable/nunito'
+import '@fontsource-variable/archivo/wdth.css'
+import '@fontsource/dm-mono/400.css'
+import '@fontsource/dm-mono/500.css'
 import './index.css'
 
 const rootElement = document.getElementById('root')

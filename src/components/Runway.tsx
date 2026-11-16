@@ -1,21 +1,23 @@
 import React from 'react';
 
-/** Decorative runway strip (THF's runways were 09L/27R and 09R/27L). */
-export default function Runway({ className = '' }: { className?: string }): React.ReactElement {
-  const thresholdBars = Array.from({ length: 6 });
+/** Threshold "piano keys" painted across a runway end. */
+export const ThresholdKeys = ({ count = 6, className = 'h-8' }: { count?: number; className?: string }): React.ReactElement => (
+  <span aria-hidden="true" className="flex gap-1 shrink-0">
+    {Array.from({ length: count }).map((_, i) => <span key={i} className={`block w-1.5 bg-white ${className}`} />)}
+  </span>
+);
+
+/** Runway strip seen from above (THF's runways were 09L/27R and 09R/27L). Decorative. */
+export default function Runway({ className = '', left = '09L', right = '27R' }: {
+  className?: string; left?: string; right?: string;
+}): React.ReactElement {
   return (
-    <div aria-hidden="true" className={`relative flex items-center gap-3 overflow-hidden h-12 px-4 ${className}`}>
-      <div className="flex flex-col gap-1 shrink-0">
-        {thresholdBars.map((_, i) => <span key={i} className="block h-0.5 w-7 bg-white/50 rounded-full" />)}
-      </div>
-      <span className="font-display font-extrabold text-white/60 tracking-widest text-base shrink-0">09L</span>
-      <div className="flex-1 flex items-center gap-4 overflow-hidden">
-        {Array.from({ length: 40 }).map((_, i) => <span key={i} className="block h-0.5 w-8 shrink-0 bg-white/40 rounded-full" />)}
-      </div>
-      <span className="font-display font-extrabold text-white/60 tracking-widest text-base shrink-0">27R</span>
-      <div className="flex flex-col gap-1 shrink-0">
-        {thresholdBars.map((_, i) => <span key={i} className="block h-0.5 w-7 bg-white/50 rounded-full" />)}
-      </div>
+    <div aria-hidden="true" className={`flex items-center gap-3.5 overflow-hidden h-[54px] px-4 bg-tarmac text-white ${className}`}>
+      <ThresholdKeys />
+      <span className="font-display font-extrabold text-2xl [font-stretch:75%] shrink-0">{left}</span>
+      <div className="flex-1 h-1 min-w-0 bg-[repeating-linear-gradient(90deg,#ffffff_0px,#ffffff_34px,transparent_34px,transparent_64px)]" />
+      <span className="font-display font-extrabold text-2xl [font-stretch:75%] shrink-0">{right}</span>
+      <ThresholdKeys />
     </div>
   );
 }

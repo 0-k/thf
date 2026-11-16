@@ -1,7 +1,6 @@
 import React from 'react';
-import { Droplets } from 'lucide-react';
 import type { Slot } from '../utils/ranking';
-import { getScoreColor } from '../utils/display';
+import { HEADING, LABEL, getScoreColor } from '../utils/display';
 import { formatHour, formatShortDate, formatWeekdayShort } from '../utils/time';
 import { dayStats, type DayGroup } from './DaySection';
 
@@ -12,15 +11,15 @@ interface WeekOutlookProps {
   onJump: (key: string, index: number) => void;
 }
 
-/** One tile per day: its best 2-hour window. Click jumps to the day. */
-export default function WeekOutlook({ days, defaultVisible, onJump }: WeekOutlookProps): React.ReactElement {
+/** One painted tile per day: its best 2-hour window. Click jumps to the day. */
+export default function WeekOutlook({ days, onJump }: WeekOutlookProps): React.ReactElement {
   return (
-    <section className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-4 sm:p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <h2 className="font-display text-2xl font-extrabold text-slate-900 whitespace-nowrap">7-Day Outlook</h2>
-        <span className="text-xs text-slate-500">Best 2-hour window per day</span>
+    <section className="text-white">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 mb-3">
+        <h2 className={`${HEADING} text-2xl`}>Seven days</h2>
+        <span className={LABEL}>Best 2-hour window per day</span>
       </div>
-      <div className="mt-3 -mx-1 px-1 flex gap-2 overflow-x-auto snap-x pb-1">
+      <div className="flex gap-1 overflow-x-auto snap-x">
         {days.map(({ day, best, relativeLabel }, index) => {
           const firstDt = day.hours[0]!.dt;
           const stats = dayStats(day.hours);
@@ -30,28 +29,22 @@ export default function WeekOutlook({ days, defaultVisible, onJump }: WeekOutloo
               key={day.key}
               type="button"
               onClick={() => onJump(day.key, index)}
-              className={`snap-start shrink-0 w-[6.75rem] sm:w-auto sm:flex-1 rounded-2xl border border-slate-200 p-2.5 text-left transition hover:border-slate-300 hover:shadow-md ${
-                index >= defaultVisible ? 'opacity-80' : ''
+              className={`snap-start shrink-0 w-24 sm:w-auto sm:flex-1 min-w-0 px-2 py-2 text-left text-ink transition hover:brightness-110 ${
+                colors ? '' : 'bg-tarmac-light text-white'
               }`}
+              style={colors ? { backgroundColor: colors.backgroundColor } : undefined}
             >
-              <div className="font-display text-base font-extrabold leading-none text-slate-800">
-                {relativeLabel ?? formatWeekdayShort(firstDt)}
+              <div className="text-[11px] uppercase tracking-wider whitespace-nowrap">
+                {relativeLabel ?? `${formatWeekdayShort(firstDt)} ${formatShortDate(firstDt).split(' ')[1] ?? ''}`}
               </div>
-              <div className="text-[11px] text-slate-500 mb-2">{formatShortDate(firstDt)}</div>
-              <div
-                className={`rounded-xl h-12 flex items-center justify-center font-display text-3xl font-extrabold ${
-                  colors ? 'border' : 'bg-slate-100 text-slate-400'
-                }`}
-                style={colors ?? undefined}
-              >
+              <div className="font-display font-black [font-stretch:85%] text-[clamp(1.6rem,4vw,2.4rem)] leading-none tabular-nums my-0.5">
                 {best ? best.score : '–'}
               </div>
-              <div className="mt-1.5 text-[11px] text-slate-600 tabular-nums">
-                {best ? `${formatHour(best.start.dt)}–${formatHour(best.start.dt + best.hours.length * 3600)}` : 'no window'}
+              <div className="text-[11px] tabular-nums whitespace-nowrap">
+                {best ? `${formatHour(best.start.dt).slice(0, 2)}–${formatHour(best.start.dt + best.hours.length * 3600).slice(0, 2)} h` : 'no window'}
               </div>
-              <div className="flex items-center justify-between text-[11px] text-slate-500 tabular-nums">
-                <span>{Math.round(stats.high)}° / {Math.round(stats.low)}°</span>
-                <span className="flex items-center gap-0.5"><Droplets className="w-3 h-3" />{Math.round(stats.maxPop * 100)}%</span>
+              <div className="text-[11px] tabular-nums whitespace-nowrap">
+                {Math.round(stats.high)}°/{Math.round(stats.low)}° · {Math.round(stats.maxPop * 100)}%
               </div>
             </button>
           );

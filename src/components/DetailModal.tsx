@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CloudSun, Droplets, Eye, Leaf, Navigation2, Sun, ThermometerSun, Users, Wind, X, Zap } from 'lucide-react';
 import type { ScoredHour } from '../utils/ranking';
 import type { Activity } from '../utils/types';
@@ -24,7 +24,7 @@ interface DetailModalProps {
 const Tile = ({ icon, title, value, sub }: {
   icon: React.ReactNode; title: string; value: React.ReactNode; sub?: string | undefined;
 }): React.ReactElement => (
-  <div className="rounded-2xl bg-slate-50 ring-1 ring-slate-100 p-3">
+  <div className="bg-slate-100 p-3">
     <div className="flex items-center gap-1.5 text-slate-500 mb-1">
       {icon}
       <span className="text-[11px] font-medium uppercase tracking-wider">{title}</span>
@@ -42,13 +42,45 @@ const Row = ({ icon, label, value }: { icon: React.ReactNode; label: string; val
 );
 
 export default function DetailModal({ hour, activity, onClose }: DetailModalProps): React.ReactElement {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      // Keep Tab inside the dialog while it is open.
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>('button, a[href], summary, [tabindex]:not([tabindex="-1"])');
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      const inside = dialogRef.current.contains(active);
+      if (e.shiftKey && (!inside || active === first || active === dialogRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (!inside || active === last)) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Move focus into the sheet, lock the page behind it, and hand focus back on close.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      opener?.focus({ preventScroll: true });
+    };
+  }, []);
 
   const { breakdown } = hour;
   const { crowd } = breakdown;
@@ -64,14 +96,16 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={`Details for ${formatLongDay(hour.dt)} ${formatHour(hour.dt)}`}
-        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto"
+        className="bg-white  shadow-2xl max-w-2xl w-full max-h-[92dvh] overflow-y-auto overscroll-contain outline-none"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Score header */}
-        <div className="relative px-5 pt-5 pb-4 sm:rounded-t-3xl rounded-t-3xl" style={{ backgroundColor: colors.backgroundColor, color: colors.color }}>
+        <div className="relative px-5 pt-5 pb-4 " style={{ backgroundColor: colors.backgroundColor, color: colors.color }}>
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15 sm:hidden" aria-hidden="true" />
           <button
             onClick={onClose}
@@ -85,7 +119,7 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
               <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.2em] opacity-80">
                 <ActivityIcon activity={activity} className="w-4 h-4" />{ACTIVITY_LABELS[activity]}
               </div>
-              <h2 className="font-display text-2xl font-extrabold leading-tight mt-1">{formatLongDay(hour.dt)}</h2>
+              <h2 className="font-display text-2xl font-black uppercase [font-stretch:105%] leading-none mt-1.5">{formatLongDay(hour.dt)}</h2>
               <p className="font-display text-lg font-semibold opacity-80">
                 {formatHour(hour.dt)}–{formatHour(hour.dt + 3600)}
                 {crowd.holiday && <span> · {crowd.holiday}</span>}
@@ -131,8 +165,8 @@ export default function DetailModal({ hour, activity, onClose }: DetailModalProp
                         -{p.points < 1 ? p.points.toFixed(1) : Math.round(p.points)}
                       </span>
                     </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full mt-1">
-                      <div className="h-1.5 bg-rose-400 rounded-full" style={{ width: `${(p.points / maxPoints) * 100}%` }} />
+                    <div className="h-1.5 bg-slate-200 mt-1">
+                      <div className="h-1.5 bg-sock" style={{ width: `${(p.points / maxPoints) * 100}%` }} />
                     </div>
                   </li>
                 ))}

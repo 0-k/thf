@@ -63,6 +63,11 @@ export interface CrowdConfig {
   multiplier: number;
 }
 
+/** Applied to the share of the hour that is dark (0-1, ramping through civil twilight) */
+export interface DarknessConfig {
+  maxPenalty: number;
+}
+
 export interface StandardActivityConfig {
   rain: RainConfig;
   wind: StandardWindConfig;
@@ -72,9 +77,12 @@ export interface StandardActivityConfig {
   airQuality: AirQualityConfig;
   uv: UVConfig;
   overcast?: OvercastConfig;
+  /** Applied to the peak gust speed in m/s (kiting scores gust *spread* instead, see KitingWindConfig) */
+  gusts?: PowerPenaltyConfig;
+  darkness: DarknessConfig;
 }
 
-export interface KitingActivityConfig extends Omit<StandardActivityConfig, 'wind'> {
+export interface KitingActivityConfig extends Omit<StandardActivityConfig, 'wind' | 'gusts'> {
   wind: KitingWindConfig;
 }
 
@@ -86,7 +94,7 @@ export interface ScoringConfig {
 }
 
 export type PenaltyFactor =
-  | 'rain' | 'wind' | 'gusts' | 'crowd' | 'cold' | 'heat' | 'airQuality' | 'uv' | 'overcast';
+  | 'rain' | 'wind' | 'gusts' | 'crowd' | 'cold' | 'heat' | 'airQuality' | 'uv' | 'overcast' | 'darkness';
 
 export interface Penalty {
   factor: PenaltyFactor;
@@ -134,27 +142,36 @@ export const OPENING_HOURS_CONFIG: MonthlyOpeningHours = {
 
 // Scoring configuration for each activity
 // Rain: fully continuous based on probability (every % counts), plus intensity
+//
+// Wind and cold use the curves tuned earlier, but no longer flatten out where the old caps sat
+// (wind 10 m/s, cold 0°C): maxPenalty/range were scaled together so every value inside the old
+// range scores exactly as before, and the curve simply keeps going. Otherwise an 18 m/s gale
+// scored like a 10 m/s breeze and -8°C like 0°C.
 export const SCORING_CONFIG: ScoringConfig = {
   cycling: {
-    rain: { maxPenalty: 55, exponent: 1.3, intensityMax: 10, intensityScale: 5 },
-    wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
+    rain: { maxPenalty: 55, exponent: 1.3, intensityMax: 25, intensityScale: 5 },
+    wind: { threshold: 3, maxPenalty: 90, range: 13.06, exponent: 1.3 },   // 10 m/s = -40 (as before), 16 m/s = -90
+    gusts: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },    // gusts from 12 m/s (DWD warns at 14)
     crowd: { multiplier: 0.25 },
-    cold: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
+    cold: { threshold: 12, maxPenalty: 70, range: 19.13, exponent: 1.2 },  // 0°C = -40 (as before), -7°C = -70
     heat: { threshold: 24, maxPenalty: 30, range: 11, exponent: 1.3 },
     airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 3, maxPenalty: 20, range: 6, exponent: 1.2 }
+    uv: { threshold: 3, maxPenalty: 20, range: 6, exponent: 1.2 },
+    darkness: { maxPenalty: 15 }                                           // unlit field, but lights do the job
   },
   jogging: {
-    rain: { maxPenalty: 32, exponent: 1.3, intensityMax: 8, intensityScale: 5 },
-    wind: { threshold: 5, maxPenalty: 15, range: 8, exponent: 1.2 },
+    rain: { maxPenalty: 32, exponent: 1.3, intensityMax: 20, intensityScale: 5 },
+    wind: { threshold: 5, maxPenalty: 60, range: 25.4, exponent: 1.2 },    // 13 m/s = -15 (as before)
+    gusts: { threshold: 12, maxPenalty: 35, range: 12, exponent: 1.2 },
     crowd: { multiplier: 0.1 },
-    cold: { threshold: 10, maxPenalty: 20, range: 10, exponent: 1.1 },
+    cold: { threshold: 10, maxPenalty: 50, range: 23, exponent: 1.1 },     // 0°C = -20 (as before), -13°C = -50
     heat: { threshold: 22, maxPenalty: 35, range: 10, exponent: 1.4 },
     airQuality: { threshold: 1, maxPenalty: 35, range: 4, exponent: 1.4 },
-    uv: { threshold: 3, maxPenalty: 25, range: 7, exponent: 1.3 }
+    uv: { threshold: 3, maxPenalty: 25, range: 7, exponent: 1.3 },
+    darkness: { maxPenalty: 12 }
   },
   kiting: {
-    rain: { maxPenalty: 40, exponent: 1.3, intensityMax: 8, intensityScale: 5 },
+    rain: { maxPenalty: 40, exponent: 1.3, intensityMax: 20, intensityScale: 5 },
     wind: {
       workableMin: 5, workableMax: 11,                        // 5-11 m/s: no penalty
       tooLight: { range: 3.5, exponent: 1.2, maxPenalty: 100 },  // 4 m/s = -22, 3 = -51, <=1.5 = -100 (can't fly)
@@ -162,23 +179,31 @@ export const SCORING_CONFIG: ScoringConfig = {
       gustiness: { threshold: 5, maxPenalty: 40, range: 8, exponent: 1.2 }, // gusts 5+ m/s above mean
     },
     crowd: { multiplier: 0.35 },
-    cold: { threshold: 10, maxPenalty: 40, range: 10, exponent: 1.4 },
+    cold: { threshold: 10, maxPenalty: 70, range: 14.9, exponent: 1.4 },   // 0°C = -40 (as before), -5°C = -70
     heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.3 },
     airQuality: { threshold: 2, maxPenalty: 15, range: 3, exponent: 1.3 },
-    uv: { threshold: 4, maxPenalty: 20, range: 6, exponent: 1.2 }
+    uv: { threshold: 4, maxPenalty: 20, range: 6, exponent: 1.2 },
+    darkness: { maxPenalty: 60 }                                           // can't see the lines or other people
   },
   socializing: {
     rain: { maxPenalty: 70, exponent: 1.4, intensityMax: 12, intensityScale: 4 },
-    wind: { threshold: 3, maxPenalty: 40, range: 7, exponent: 1.3 },
+    wind: { threshold: 3, maxPenalty: 90, range: 13.06, exponent: 1.3 },   // 10 m/s = -40 (as before), 16 m/s = -90
+    gusts: { threshold: 12, maxPenalty: 40, range: 12, exponent: 1.2 },
     crowd: { multiplier: 0.25 },
-    cold: { threshold: 15, maxPenalty: 35, range: 15, exponent: 1.3 },
+    // Sitting still: mild days cost about what they did (12°C = -4, 10°C = -9), but frost is no
+    // longer "fair" (5°C = -29, 0°C = -55; was -21 / -35)
+    cold: { threshold: 15, maxPenalty: 85, range: 19.7, exponent: 1.6 },
     heat: { threshold: 28, maxPenalty: 20, range: 10, exponent: 1.2 },
     airQuality: { threshold: 2, maxPenalty: 20, range: 3, exponent: 1.3 },
     uv: { threshold: 3, maxPenalty: 30, range: 7, exponent: 1.3 },
     // Sitting on the grass under a grey sky (daylight hours only)
-    overcast: { threshold: 40, maxPenalty: 20, range: 60, exponent: 1.2 }
+    overcast: { threshold: 40, maxPenalty: 20, range: 60, exponent: 1.2 },
+    darkness: { maxPenalty: 50 }
   }
 };
+
+/** Civil twilight at Berlin's latitude lasts roughly this long (hours) */
+export const TWILIGHT_HOURS = 0.65;
 
 // ============================================================================
 // Utility Functions
@@ -228,12 +253,11 @@ const rampPenalty = (distance: number, config: RampConfig): number => {
  * Actual precipitation amount adds an intensity penalty on top.
  */
 export const calculateRainPenalty = (pop: number, precipitationMm: number, config: RainConfig): number => {
-  if (pop <= 0) return 0;
-
   // Probability-based penalty: continuous from 0% to 100%
-  const probPenalty = Math.pow(Math.min(1, pop), config.exponent) * config.maxPenalty;
+  const probPenalty = Math.pow(Math.min(1, Math.max(0, pop)), config.exponent) * config.maxPenalty;
 
-  // Intensity penalty: actual precipitation amount increases severity
+  // Intensity penalty: actual precipitation amount increases severity. Counts even at 0%
+  // probability (some model runs deliver amounts without a probability).
   let intensityPenalty = 0;
   if (precipitationMm > 0) {
     intensityPenalty = Math.min(config.intensityMax,
@@ -277,6 +301,22 @@ const isDaylight = (dt: number): boolean => {
   return mid > sunrise && mid < sunset;
 };
 
+/**
+ * Share (0-1) of the hour slot starting at `dt` that is dark. Ramps linearly through civil
+ * twilight, so the hour around sunset costs a little and full night costs everything.
+ */
+export const darkShare = (dt: number): number => {
+  const p = berlinParts(dt);
+  const { sunrise, sunset } = getSunTimes(p.year, p.month, p.day);
+  const samples = 6;
+  let sum = 0;
+  for (let k = 0; k < samples; k++) {
+    const t = p.hour + (k + 0.5) / samples;
+    sum += Math.max(0, Math.min(1, Math.max(t - sunset, sunrise - t) / TWILIGHT_HOURS));
+  }
+  return sum / samples;
+};
+
 export const hasThunderstorm = (hourData: HourData): boolean =>
   hourData.hasThunderstorm || hourData.weather[0]?.main === 'Thunderstorm';
 
@@ -314,6 +354,9 @@ export const scoreHour = (activity: Activity, hourData: HourData): ScoreBreakdow
       powerPenalty(gust - windSpeed, w.gustiness));
   } else {
     add('wind', 'Wind', `${windSpeed.toFixed(1)} m/s`, powerPenalty(windSpeed, config.wind));
+    if ('gusts' in config && config.gusts && hourData.wind_gust !== undefined) {
+      add('gusts', 'Gusts', `up to ${Math.round(hourData.wind_gust)} m/s`, powerPenalty(hourData.wind_gust, config.gusts));
+    }
   }
 
   // Crowds
@@ -340,6 +383,11 @@ export const scoreHour = (activity: Activity, hourData: HourData): ScoreBreakdow
   if (config.overcast && hourData.clouds !== undefined && isDaylight(hourData.dt)) {
     add('overcast', 'No sun', `${Math.round(hourData.clouds)}% cloud cover`, powerPenalty(hourData.clouds, config.overcast));
   }
+
+  // Darkness: the field has no lighting
+  const dark = darkShare(hourData.dt);
+  add('darkness', 'Darkness', berlinParts(hourData.dt).hour >= 12 ? 'after sunset' : 'before sunrise',
+    dark * config.darkness.maxPenalty);
 
   penalties.sort((a, b) => b.points - a.points);
   const total = penalties.reduce((sum, p) => sum + p.points, 0);
@@ -394,8 +442,16 @@ export const explainActivity = (activity: Activity): FactorExplanation[] => {
     rows.push({
       title: 'Wind',
       rule: `From ${w.threshold} m/s (max -${w.maxPenalty})`,
-      examples: [5, 7, 10].map(s => `${s} m/s = ${fmt(powerPenalty(s, w))}`).join(', '),
+      examples: [5, 7, 10, 14].map(s => `${s} m/s = ${fmt(powerPenalty(s, w))}`).join(', '),
     });
+    if ('gusts' in c && c.gusts) {
+      const g = c.gusts;
+      rows.push({
+        title: 'Gusts',
+        rule: `Gusts above ${g.threshold} m/s (max -${g.maxPenalty})`,
+        examples: [14, 18, 24].map(s => `${s} m/s = ${fmt(powerPenalty(s, g))}`).join(', '),
+      });
+    }
   }
 
   rows.push({
@@ -406,7 +462,7 @@ export const explainActivity = (activity: Activity): FactorExplanation[] => {
   rows.push({
     title: 'Cold',
     rule: `Below ${c.cold.threshold}°C (max -${c.cold.maxPenalty})`,
-    examples: [c.cold.threshold - 4, c.cold.threshold - 8, 0]
+    examples: [c.cold.threshold - 4, c.cold.threshold - 8, 0, -5]
       .map(t => `${t}°C = ${fmt(penaltyBelow(t, c.cold))}`).join(', '),
   });
   rows.push({
@@ -433,5 +489,10 @@ export const explainActivity = (activity: Activity): FactorExplanation[] => {
       examples: [70, 100].map(cc => `${cc}% = ${fmt(powerPenalty(cc, o))}`).join(', '),
     });
   }
+  rows.push({
+    title: 'Darkness',
+    rule: `No lighting on the field: up to -${c.darkness.maxPenalty} at night`,
+    examples: 'Fades in through twilight after sunset and before sunrise',
+  });
   return rows;
 };

@@ -30,8 +30,9 @@ A weather-based activity scoring app for Tempelhofer Feld in Berlin. Get hourly 
   - Detailed modal for each hour
   - Always in Berlin time, wherever you open it
 
-- **Airfield design**: live sky header that follows the time of day and weather, a "Departures" board
-  for the best times, runway markings, a friendly self-hosted font (Nunito)
+- **Airfield design**: the field seen from above as a bold poster (mown grass, asphalt, white paint, windsock
+  orange). The two rows of hours are the two runways and a windsock shows the wind. Self-hosted fonts
+  (Archivo, DM Mono)
 
 - **100% Free**:
   - No API keys required
